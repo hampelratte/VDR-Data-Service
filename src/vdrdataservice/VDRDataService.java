@@ -117,8 +117,8 @@ public class VDRDataService extends AbstractTvDataService {
                         || progTime.get(Calendar.DAY_OF_MONTH) == start
                                 .get(Calendar.DAY_OF_MONTH)) {
                     program = new MutableProgram(channel, new Date(progTime),
-                            progTime.get(Calendar.HOUR_OF_DAY), progTime
-                                    .get(Calendar.MINUTE));
+                            progTime.get(Calendar.HOUR_OF_DAY), 
+                            progTime.get(Calendar.MINUTE), false);
                     dayOK = true;
                 } else {
                     continue;
