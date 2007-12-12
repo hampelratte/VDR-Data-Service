@@ -56,12 +56,12 @@ public class VDRDataService extends AbstractTvDataService {
             devplugin.Date date, int dateCount, ProgressMonitor pm)
             throws TvBrowserException {
         
+    	pm.setMaximum(channels.length);
         if(channels.length > 0) {
 	        for (int i = 0; i < channels.length; i++) {
 	            //pm.setMessage(localizer.msg("getting_data","Getting data from VDR for " + channels[i].getName()));
                 pm.setMessage("Getting data from VDR for " + channels[i].getName());
-	            Response res = VDRConnection
-	                    .send(new LSTE(channels[i].getId(), ""));
+	            Response res = VDRConnection.send(new LSTE(channels[i].getId(), ""));
 	            if (res != null && res.getCode() == 215) {
 	                String data = res.getMessage();
 	                pm.setMessage(localizer.msg("parsing_data","Parsing data"));
@@ -69,18 +69,14 @@ public class VDRDataService extends AbstractTvDataService {
 	                        channels[i], date, dateCount);
 	                pm.setMessage(localizer.msg("updating_database","Updating EPG database"));
 	                for (int j = 0; j < dayPrograms.length; j++) {
-	                    database.updateDayProgram(dayPrograms[j]);
+	                	if(dayPrograms[j].getProgramCount() > 0) {
+	                		database.updateDayProgram(dayPrograms[j]);
+	                	}
 	                }
 	            } else {
                     pm.setMessage(channels[i].getName() +" Error "+res.getCode()+": " + res.getMessage());
-                    /*
-                    try {
-                        Thread.sleep(2000);
-                    } catch (InterruptedException e) {
-                    }*/
 	            }
 	            
-	            pm.setMaximum(channels.length);
 	            pm.setValue(i);
 	        }
         }
@@ -250,8 +246,6 @@ public class VDRDataService extends AbstractTvDataService {
 				iterator.remove();
 			}
 		}
-		
-		props.list(System.out);
 	}
 
 	public boolean hasSettingsPanel() {
@@ -302,7 +296,8 @@ public class VDRDataService extends AbstractTvDataService {
 						// distinguish between radio and tv channels / pay-tv
 						int category = getChannelCategory(vdrChan);
 						// create a new tvbrowser channel object
-						Channel chan = new Channel(this, vdrChan.getName(), vdrChan.getChannelID(), TimeZone.getDefault(), "de", "", "", cg, null, category);
+						Channel chan = new Channel(this, vdrChan.getName(), Integer.toString(vdrChan.getChannelNumber()),
+								TimeZone.getDefault(), "de", "", "", cg, null, category);
 	                    channelList.add(chan);
 					}
 				}
