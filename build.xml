@@ -1,0 +1,50 @@
+<?xml version="1.0"?>
+
+<project name="VDRDataService" default="run" basedir=".">
+
+	<property name="tvbrowser.dir" value="/home/henni/devel/svdrp/TVBrowser" />
+	<property name="tvbrowser.lib.dir" value="${tvbrowser.dir}/lib" />
+	<property name="tvbrowser.src.dir" value="${tvbrowser.dir}/src" />
+	<property name="tvbrowser.runtime.dir" value="${tvbrowser.dir}/runtime/tvbrowser_linux" />
+
+	<property name="src.dir" value="src" />
+	<property name="lib.dir" value="lib" />
+	<property name="build.dir" value="build" />
+	<property name="classes.dir" value="${build.dir}/classes" />
+	<property name="res.dir" value="res" />
+
+
+	<target name="compile" depends="clean">
+		<mkdir dir="${build.dir}"/>
+		<mkdir dir="${classes.dir}" />
+		<javac srcdir="${src.dir}" destdir="${classes.dir}" deprecation="true"
+			debug="true" debuglevel="lines">
+			<classpath>
+				<pathelement location="${tvbrowser.runtime.dir}/tvbrowser.jar" />
+				<pathelement location="${lib.dir}/svdrp4j.jar" />
+			</classpath>
+		</javac>
+	</target>
+	
+	<target name="clean">
+		<delete dir="${build.dir}"/>
+	</target>
+	
+	<target name="jar" depends="compile">
+		<mkdir dir="${classes.dir}/vdrdataservice" />
+		<unjar src="${lib.dir}/svdrp4j.jar" dest="${classes.dir}"/>
+		<copy todir="${classes.dir}/vdrdataservice">
+		      <fileset dir="${res.dir}/language" includes="**/*.properties"/>
+        </copy>
+		<jar destfile="${tvbrowser.runtime.dir}/plugins/VDRDataService.jar" basedir="${classes.dir}">
+		</jar>
+	</target>
+
+	<target name="run" depends="jar">
+		<java jar="${tvbrowser.runtime.dir}/tvbrowser.jar" dir="${tvbrowser.runtime.dir}" fork="true">
+			<jvmarg value="-Duser.home=/home/henni/.tvbrowser-vdr-local"/>
+			<jvmarg value="-Dawt.toolkit=sun.awt.motif.MToolkit"/>
+		</java>
+	</target>
+
+</project>
