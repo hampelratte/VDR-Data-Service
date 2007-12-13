@@ -1,0 +1,11 @@
+Installation
+===============================================================================
+1. Kopiere VDRDataService.jar in das Plugin-Verzeichnis vom TV-Browser. Siehe
+   http://wiki.tvbrowser.org/index.php/Plugins#Installation_von_Plugins
+2. Starte TV-Browser
+3. Konfiguriere VDRDataService unter 
+   Einstellungen -> TVDataServices -> VDRDataService
+4. Aktualisiere die Senderliste unter 
+   Einstellungen -> Allgemeine Einstellungen -> Sender 
+   Klicke auf "Senderliste aktualisieren"
+5. Füge die gewünschten Sender zu den dargestellten Sendern hinzu

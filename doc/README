@@ -1,0 +1,10 @@
+Installation
+===============================================================================
+1. Copy the VDRDataService.jar to the plugins directory of TV-Browser. See
+   http://enwiki.tvbrowser.org/index.php/Plugin#Installation_of_Plugins for
+   details.
+2. Start TV-Browser
+3. Configure VDRDataService under Settings -> TVDataServices -> VDRDataService
+4. Update the channel list under Settings -> General settings -> Channels
+   Hit the button "Update channel list" at the bottom of the panel
+5. Select the channels you want adn add them to "Subscribed Channels"
