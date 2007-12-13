@@ -1,17 +1,18 @@
 <?xml version="1.0"?>
 
 <project name="VDRDataService" default="run" basedir=".">
-
-	<property name="tvbrowser.dir" value="/home/henni/devel/svdrp/TVBrowser" />
+    <property file="build.properties"/>
+	
 	<property name="tvbrowser.lib.dir" value="${tvbrowser.dir}/lib" />
 	<property name="tvbrowser.src.dir" value="${tvbrowser.dir}/src" />
-	<property name="tvbrowser.runtime.dir" value="${tvbrowser.dir}/runtime/tvbrowser_linux" />
 
 	<property name="src.dir" value="src" />
+	<property name="doc.dir" value="doc"/>
 	<property name="lib.dir" value="lib" />
 	<property name="build.dir" value="build" />
 	<property name="classes.dir" value="${build.dir}/classes" />
 	<property name="res.dir" value="res" />
+	<property name="jar.file" value="${tvbrowser.runtime.dir}/plugins/VDRDataService.jar"/>
 
 
 	<target name="compile" depends="clean">
@@ -36,9 +37,29 @@
 		<copy todir="${classes.dir}/vdrdataservice">
 		      <fileset dir="${res.dir}/language" includes="**/*.properties"/>
         </copy>
-		<jar destfile="${tvbrowser.runtime.dir}/plugins/VDRDataService.jar" basedir="${classes.dir}">
+		<jar destfile="${jar.file}" basedir="${classes.dir}">
 		</jar>
 	</target>
+	
+	<target name="dist" depends="jar" description="Make distribution zip">
+        <property name="dist-tmp.dir" value="${build.dir}/dist-tmp"/>        
+        <mkdir dir="${dist-tmp.dir}"/>
+        
+        <delete>
+            <fileset dir="${build.dir}" includes="*.zip"/>
+        </delete>
+        
+        <copy file="${jar.file}" todir="${dist-tmp.dir}/${ant.project.name}-${version}/"/>
+        <copy todir="${dist-tmp.dir}/${ant.project.name}-${version}">
+            <fileset dir="${doc.dir}">
+            </fileset>
+        </copy>
+        
+        <zip destfile="${build.dir}/${ant.project.name}-${version}.zip" 
+             basedir="${dist-tmp.dir}"/>
+
+        <delete dir="${dist-tmp.dir}"/>
+    </target>
 
 	<target name="run" depends="jar">
 		<java jar="${tvbrowser.runtime.dir}/tvbrowser.jar" dir="${tvbrowser.runtime.dir}" fork="true">
