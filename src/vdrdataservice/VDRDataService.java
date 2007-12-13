@@ -325,7 +325,6 @@ public class VDRDataService extends AbstractTvDataService {
     	}
     }
 
-    @Override
     public ChannelGroup[] checkForAvailableChannelGroups(ProgressMonitor arg0) throws TvBrowserException {
         return getAvailableGroups();
     }
@@ -334,7 +333,6 @@ public class VDRDataService extends AbstractTvDataService {
         return false;
     }
 
-	@Override
 	public void setWorkingDirectory(File dataDir) {}
 
 	public static Version getVersion() {
