@@ -44,6 +44,7 @@ public class VDRDataService extends AbstractTvDataService {
     		localizer.msg("desc", "Loads the EPG-Data from VDR (by Klaus Schmidinger) into TV-Browser"),
             "Henrik Niehaus (hampelratte@users.sf.net)");
     
+    
    
 
     /*
@@ -145,6 +146,7 @@ public class VDRDataService extends AbstractTvDataService {
         // set defaults
         props.setProperty("vdr.host", "htpc");
         props.setProperty("vdr.port", "2001");
+        props.setProperty("charset", "ISO-8859-1");
         props.setProperty("max.channel.number", "100");
 
         // overwrite defaults with values from configfile
@@ -186,8 +188,7 @@ public class VDRDataService extends AbstractTvDataService {
 
         VDRConnection.host = props.getProperty("vdr.host");
         VDRConnection.port = Integer.parseInt(props.getProperty("vdr.port"));
-        
-        settingsPanel = new VDRDataServiceSettingsPanel(this);
+        VDRConnection.charset = props.getProperty("charset") == null ? "ISO-8859-1" : props.getProperty("charset");
     }
     
     
@@ -253,6 +254,11 @@ public class VDRDataService extends AbstractTvDataService {
     }
     
     public SettingsPanel getSettingsPanel() {
+        if(settingsPanel == null) {
+            settingsPanel = new VDRDataServiceSettingsPanel();
+            settingsPanel.setVdrDataService(this);
+            settingsPanel.loadSettings();
+        }
         return settingsPanel;
     }
 
@@ -336,6 +342,6 @@ public class VDRDataService extends AbstractTvDataService {
 	public void setWorkingDirectory(File dataDir) {}
 
 	public static Version getVersion() {
-		return new Version(0,10);
+		return new Version(0,20);
 	}
 }

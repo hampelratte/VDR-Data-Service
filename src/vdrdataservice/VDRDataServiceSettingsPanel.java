@@ -5,6 +5,9 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 
+import javax.swing.ComboBoxModel;
+import javax.swing.DefaultComboBoxModel;
+import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JSpinner;
@@ -34,7 +37,7 @@ public class VDRDataServiceSettingsPanel extends SettingsPanel {
     private static final Localizer mLocalizer = Localizer
       .getLocalizerFor(VDRDataServiceSettingsPanel.class);
 
-    VDRDataService parent;
+    VDRDataService vdrDataService;
 
 	private JLabel lHost = new JLabel(mLocalizer.msg("host", "Host"));
 
@@ -44,19 +47,25 @@ public class VDRDataServiceSettingsPanel extends SettingsPanel {
 
 	private JTextField port;
 	private JPanel panel;
+    private JComboBox comboCharset;
+    private JLabel lCharset;
 	private JSpinner spinMaxChannel;
 	private JLabel lMaxChannel;
 
-	public VDRDataServiceSettingsPanel(VDRDataService parent) {
-		this.parent = parent;
+	public VDRDataServiceSettingsPanel() {
 		initGUI();
-		loadSettings();
 	}
   
-    private void loadSettings() {
-    	host.setText(parent.getProperty("vdr.host"));
-    	port.setText(parent.getProperty("vdr.port"));
-    	int maxChan = Integer.parseInt(parent.getProperty("max.channel.number"));
+    protected void loadSettings() {
+    	host.setText(vdrDataService.getProperty("vdr.host"));
+    	port.setText(vdrDataService.getProperty("vdr.port"));
+    	int maxChan = Integer.parseInt(vdrDataService.getProperty("max.channel.number"));
+    	String charset = vdrDataService.getProperty("charset");
+    	if(charset == null) {
+    	    comboCharset.setSelectedIndex(0);
+    	} else {
+    	    comboCharset.setSelectedItem(charset);
+    	}
     	spinMaxChannel.setValue(maxChan);
     }
 
@@ -68,8 +77,8 @@ public class VDRDataServiceSettingsPanel extends SettingsPanel {
 
 		GridBagLayout thisLayout = new GridBagLayout();
 		panel.setLayout(thisLayout);
-		thisLayout.rowWeights = new double[] { 0.1, 0.1, 0.1 };
-		thisLayout.rowHeights = new int[] { 7, 7, 7 };
+		thisLayout.rowWeights = new double[] {0.1, 0.1, 0.1, 0.1};
+		thisLayout.rowHeights = new int[] {7, 7, 7, 7};
 		thisLayout.columnWeights = new double[] { 0.1, 0.1 };
 		thisLayout.columnWidths = new int[] { 7, 7 };
 		GridBagConstraints gbc = new GridBagConstraints();
@@ -119,20 +128,38 @@ public class VDRDataServiceSettingsPanel extends SettingsPanel {
 					new Insets(5, 5, 5, 5), 0, 0));
 			spinMaxChannel.setModel(spinMaxChannelModel);
 		}
+		{
+		    lCharset = new JLabel();
+		    panel.add(lCharset, new GridBagConstraints(0, 3, 1, 1, 0.0, 0.0, GridBagConstraints.WEST, GridBagConstraints.NONE, new Insets(5, 5, 5, 5), 0, 0));
+		    lCharset.setText(mLocalizer.msg("charset", "Charset"));
+		}
+		{
+		    ComboBoxModel comboCharsetModel = 
+		        new DefaultComboBoxModel(
+		                new String[] { "ISO-8859-1", "ISO-8859-15", "UTF-8" });
+		    comboCharset = new JComboBox();
+		    panel.add(comboCharset, new GridBagConstraints(1, 3, 1, 1, 0.0, 0.0, GridBagConstraints.WEST, GridBagConstraints.NONE, new Insets(5, 5, 5, 5), 0, 0));
+		    comboCharset.setModel(comboCharsetModel);
+		}
 
 		setLayout(new FlowLayout());
+        this.setPreferredSize(new java.awt.Dimension(591, 138));
 		add(panel);
 	}
 
 	public void ok() {
 		String h = host.getText();
 		int p = Integer.parseInt(port.getText());
+		String charset = comboCharset.getSelectedItem().toString();
 		VDRConnection.host = h;
 		VDRConnection.port = p;
-
-		parent.setProperty("vdr.host", h);
-		parent.setProperty("vdr.port", port.getText());
-		parent.setProperty("max.channel.number", spinMaxChannel.getValue().toString());
+		VDRConnection.charset = charset;
+		
+		vdrDataService.setProperty("vdr.host", h);
+		vdrDataService.setProperty("vdr.port", port.getText());
+		vdrDataService.setProperty("charset", charset);
+		vdrDataService.setProperty("max.channel.number", spinMaxChannel.getValue().toString());
+		
 	}
 
 	/**
@@ -153,4 +180,13 @@ public class VDRDataServiceSettingsPanel extends SettingsPanel {
 	public VDRDataServiceSettingsPanel(Boolean initGUI) {
 		super();
 	}
+
+    public VDRDataService getVdrDataService() {
+        return vdrDataService;
+    }
+
+    public void setVdrDataService(VDRDataService plugin) {
+        this.vdrDataService = plugin;
+    }
+
 }

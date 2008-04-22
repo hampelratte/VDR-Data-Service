@@ -18,11 +18,12 @@ public class VDRConnection {
     private static Connection connection;
     protected static String host;
     protected static int port;
+    protected static String charset;
 
     public static Response send(Command cmd) {
         Response res = null;
         try {
-            connection = new Connection(VDRConnection.host, VDRConnection.port);
+            connection = new Connection(VDRConnection.host, VDRConnection.port, 500, charset);
             res = connection.send(cmd);
             connection.close();
         } catch (Exception e1) {
@@ -30,13 +31,4 @@ public class VDRConnection {
         } 
         return res;
     }
-    
-    public static boolean isAvailable() {
-      try {
-          connection = new Connection(VDRConnection.host, VDRConnection.port);
-          connection.close();
-          return true;
-      } catch (Exception e1) {} 
-      return false;
-  }
 }
