@@ -75,7 +75,14 @@ public class VDRDataService extends AbstractTvDataService {
 	                	}
 	                }
 	            } else {
-                    pm.setMessage(channels[i].getName() +" Error "+res.getCode()+": " + res.getMessage());
+	                StringBuffer sb = new StringBuffer(channels[i].getName());
+	                sb.append(" Error ");
+	                if(res != null) {
+	                    sb.append(res.getCode());
+	                    sb.append(": ");
+	                    sb.append(res.getMessage());
+	                }
+                    pm.setMessage(sb.toString());
 	            }
 	            
 	            pm.setValue(i);
@@ -279,7 +286,7 @@ public class VDRDataService extends AbstractTvDataService {
     public Channel[] getAvailableChannels(ChannelGroup cg) {
         if(cg.equals(this.cg)) {
         	logger.info("Returning " + channels.length + " channels");
-        	return channels;
+        	return this.channels;
         } else {
             return new Channel[] {};
         }
@@ -303,7 +310,7 @@ public class VDRDataService extends AbstractTvDataService {
 						int category = getChannelCategory(vdrChan);
 						// create a new tvbrowser channel object
 						Channel chan = new Channel(this, vdrChan.getName(), Integer.toString(vdrChan.getChannelNumber()),
-								TimeZone.getDefault(), "de", "", "", cg, null, category);
+								TimeZone.getDefault(), "de", "", "", cg, null, category, vdrChan.getName());
 	                    channelList.add(chan);
 					}
 				}
@@ -324,9 +331,9 @@ public class VDRDataService extends AbstractTvDataService {
     		return Channel.CATEGORY_RADIO;
     	} else { // a tv channel
     		if(!"0".equals(chan.getConditionalAccess())) {
-    			return Channel.CATEGORY_PAY_TV;
+    			return Channel.CATEGORY_TV | Channel.CATEGORY_PAY_TV;
     		} else {
-    			return Channel.CATEGORY_DIGITAL;
+    			return Channel.CATEGORY_TV | Channel.CATEGORY_DIGITAL;
     		}
     	}
     }
