@@ -1,6 +1,7 @@
 package vdrdataservice;
 
 import java.io.File;
+import java.text.ParseException;
 import java.util.*;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
@@ -9,6 +10,7 @@ import java.util.regex.Pattern;
 import org.hampelratte.svdrp.Response;
 import org.hampelratte.svdrp.commands.LSTC;
 import org.hampelratte.svdrp.commands.LSTE;
+import org.hampelratte.svdrp.responses.highlevel.DVBChannel;
 import org.hampelratte.svdrp.util.ChannelParser;
 
 import tvdataservice.MutableChannelDayProgram;
@@ -293,39 +295,52 @@ public class VDRDataService extends AbstractTvDataService {
     }
 
     public Channel[] checkForAvailableChannels(ChannelGroup cg, ProgressMonitor pm) throws TvBrowserException {
-        if(cg.getId().equals(this.cg.getId())) {
-        	Channel[] channels = new Channel[] {};
-            pm.setMessage(localizer.msg("getting_data","Getting data from VDR..."));
+        if (cg.getId().equals(this.cg.getId())) {
+            Channel[] channels = new Channel[] {};
+            pm.setMessage(localizer.msg("getting_data", "Getting data from VDR..."));
             // load channel list from vdr
             Response res = VDRConnection.send(new LSTC());
-            if(res.getCode() == 250) {
-            	// parse the channel list
-            	List<org.hampelratte.svdrp.responses.highlevel.Channel> vdrChannelList = ChannelParser.parse(res.getMessage());
-            	List channelList = new ArrayList();
-            	for (Iterator iterator = vdrChannelList.iterator(); iterator.hasNext();) {
-					org.hampelratte.svdrp.responses.highlevel.Channel vdrChan = (org.hampelratte.svdrp.responses.highlevel.Channel) iterator.next();
-					int maxChannel = Integer.parseInt(props.getProperty("max.channel.number"));
-					if(maxChannel == 0 || maxChannel > 0 && vdrChan.getChannelNumber() <= maxChannel) {
-						// distinguish between radio and tv channels / pay-tv
-						int category = getChannelCategory(vdrChan);
-						// create a new tvbrowser channel object
-						Channel chan = new Channel(this, vdrChan.getName(), Integer.toString(vdrChan.getChannelNumber()),
-								TimeZone.getDefault(), "de", "", "", cg, null, category, vdrChan.getName());
-	                    channelList.add(chan);
-					}
-				}
-            	
-            	// convert channel list to an array
-                channels = (Channel[]) channelList.toArray(channels);
+            if (res.getCode() == 250) {
+                try {
+                    // parse the channel list
+                    List<org.hampelratte.svdrp.responses.highlevel.Channel> vdrChannelList = ChannelParser.parse(res.getMessage(), false);
+                    List channelList = new ArrayList();
+                    for (Iterator iterator = vdrChannelList.iterator(); iterator.hasNext();) {
+                        org.hampelratte.svdrp.responses.highlevel.Channel c = (org.hampelratte.svdrp.responses.highlevel.Channel) iterator.next();
+                        DVBChannel vdrChan = null;
+                        if (c instanceof DVBChannel) {
+                            vdrChan = (DVBChannel) c;
+                        } else {
+                            continue;
+                        }
+                        
+                        int maxChannel = Integer.parseInt(props.getProperty("max.channel.number"));
+                        if (maxChannel == 0 || maxChannel > 0 && vdrChan.getChannelNumber() <= maxChannel) {
+                            // distinguish between radio and tv channels /
+                            // pay-tv
+                            int category = getChannelCategory(vdrChan);
+                            // create a new tvbrowser channel object
+                            Channel chan = new Channel(this, vdrChan.getName(), Integer.toString(vdrChan.getChannelNumber()), TimeZone.getDefault(), "de", "", "", cg, null, category, vdrChan.getName());
+                            channelList.add(chan);
+                        }
+                    }
+
+                    // convert channel list to an array
+                    channels = (Channel[]) channelList.toArray(channels);
+
+                } catch (NumberFormatException e) {
+                    logger.severe(e.getMessage());
+                } catch (ParseException e) {
+                    logger.severe(e.getMessage());
+                }
             }
-            this.channels = channels;
             return channels;
         } else {
             return new Channel[] {};
         }
     }
     
-    private int getChannelCategory(org.hampelratte.svdrp.responses.highlevel.Channel chan) {
+    private int getChannelCategory(DVBChannel chan) {
     	String vpid = chan.getVPID();
     	if("0".equals(vpid) || "1".equals(vpid)) { // a radio station
     		return Channel.CATEGORY_RADIO;
