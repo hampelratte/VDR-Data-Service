@@ -296,7 +296,6 @@ public class VDRDataService extends AbstractTvDataService {
 
     public Channel[] checkForAvailableChannels(ChannelGroup cg, ProgressMonitor pm) throws TvBrowserException {
         if (cg.getId().equals(this.cg.getId())) {
-            Channel[] channels = new Channel[] {};
             pm.setMessage(localizer.msg("getting_data", "Getting data from VDR..."));
             // load channel list from vdr
             Response res = VDRConnection.send(new LSTC());
