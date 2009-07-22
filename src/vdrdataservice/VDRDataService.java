@@ -1,17 +1,31 @@
 package vdrdataservice;
 
 import java.io.File;
+import java.io.IOException;
+import java.text.DateFormat;
 import java.text.ParseException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Enumeration;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Properties;
+import java.util.TimeZone;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.swing.JOptionPane;
+
+import org.hampelratte.svdrp.Connection;
 import org.hampelratte.svdrp.Response;
 import org.hampelratte.svdrp.commands.LSTC;
 import org.hampelratte.svdrp.commands.LSTE;
 import org.hampelratte.svdrp.responses.highlevel.DVBChannel;
+import org.hampelratte.svdrp.responses.highlevel.EPGEntry;
 import org.hampelratte.svdrp.util.ChannelParser;
+import org.hampelratte.svdrp.util.EPGParser;
 
 import tvdataservice.MutableChannelDayProgram;
 import tvdataservice.MutableProgram;
@@ -19,8 +33,14 @@ import tvdataservice.SettingsPanel;
 import tvdataservice.TvDataUpdateManager;
 import util.exc.TvBrowserException;
 import util.ui.Localizer;
-import devplugin.*;
+import devplugin.AbstractTvDataService;
+import devplugin.Channel;
+import devplugin.ChannelGroup;
+import devplugin.ChannelGroupImpl;
 import devplugin.Date;
+import devplugin.PluginInfo;
+import devplugin.ProgressMonitor;
+import devplugin.Version;
 
 /**
  * @author <a href="hampelratte@users.sf.net>hampelratte@users.sf.net </a>
@@ -46,105 +66,96 @@ public class VDRDataService extends AbstractTvDataService {
     		localizer.msg("desc", "Loads the EPG-Data from VDR (by Klaus Schmidinger) into TV-Browser"),
             "Henrik Niehaus (hampelratte@users.sf.net)");
     
-    
-   
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see tvdataservice.TvDataService#updateTvData(tvdataservice.TvDataUpdateManager,
-     *      devplugin.Channel[], devplugin.Date, int, devplugin.ProgressMonitor)
-     */
     public void updateTvData(TvDataUpdateManager database, Channel[] channels,
             devplugin.Date date, int dateCount, ProgressMonitor pm)
             throws TvBrowserException {
         
     	pm.setMaximum(channels.length);
         if(channels.length > 0) {
-	        for (int i = 0; i < channels.length; i++) {
-	            //pm.setMessage(localizer.msg("getting_data","Getting data from VDR for " + channels[i].getName()));
-                pm.setMessage("Getting data from VDR for " + channels[i].getName());
-	            Response res = VDRConnection.send(new LSTE(channels[i].getId(), ""));
-	            if (res != null && res.getCode() == 215) {
-	                String data = res.getMessage();
-	                pm.setMessage(localizer.msg("parsing_data","Parsing data"));
-	                MutableChannelDayProgram[] dayPrograms = parseData(data,
-	                        channels[i], date, dateCount);
-	                pm.setMessage(localizer.msg("updating_database","Updating EPG database"));
-	                for (int j = 0; j < dayPrograms.length; j++) {
-	                	if(dayPrograms[j].getProgramCount() > 0) {
-	                		database.updateDayProgram(dayPrograms[j]);
-	                	}
-	                }
-	            } else {
-	                StringBuffer sb = new StringBuffer(channels[i].getName());
-	                sb.append(" Error ");
-	                if(res != null) {
-	                    sb.append(res.getCode());
-	                    sb.append(": ");
-	                    sb.append(res.getMessage());
-	                }
-                    pm.setMessage(sb.toString());
-	            }
-	            
-	            pm.setValue(i);
-	        }
+            Connection conn = null;
+            try {
+                conn = new Connection(VDRConnection.host, VDRConnection.port, 500, VDRConnection.charset);
+                for (int i = 0; i < channels.length; i++) {
+                    //pm.setMessage(localizer.msg("getting_data","Getting data from VDR for " + channels[i].getName()));
+                    pm.setMessage(localizer.msg("getting_data", "Getting data from VDR for {0}", channels[i].getName()));
+                    Response res = conn.send(new LSTE(channels[i].getId(), ""));
+                    if (res != null && res.getCode() == 215) {
+                        String data = res.getMessage();
+                        pm.setMessage(localizer.msg("parsing_data","Parsing data"));
+                        MutableChannelDayProgram[] dayPrograms = parseData(data, channels[i], date, dateCount);
+                        pm.setMessage(localizer.msg("updating_database","Updating EPG database"));
+                        for (int j = 0; j < dayPrograms.length; j++) {
+                        	if(dayPrograms[j].getProgramCount() > 0) {
+                        		database.updateDayProgram(dayPrograms[j]);
+                        		logger.info("Adding mutable program: " + dayPrograms[j]);
+                        	}
+                        }
+                    } else {
+                        StringBuffer sb = new StringBuffer(channels[i].getName());
+                        sb.append(" Error ");
+                        if(res != null) {
+                            sb.append(res.getCode());
+                            sb.append(": ");
+                            sb.append(res.getMessage());
+                        }
+                        pm.setMessage(sb.toString());
+                    }
+                    
+                    pm.setValue(i);
+                }
+            } catch (Exception e) {
+                logger.severe(e.getLocalizedMessage());
+                JOptionPane.showMessageDialog(getParentFrame(), 
+                        localizer.msg("couldnt_connect", "<html>Couldn't connect to VDR<br>{0}</html>",  
+                                e.getClass().getSimpleName() + ": " + e.getLocalizedMessage()), 
+                        Localizer.getLocalization(Localizer.I18N_ERROR), JOptionPane.ERROR_MESSAGE);
+            } finally {
+                if(conn != null) {
+                    try {
+                        conn.close();
+                    } catch (IOException e) {
+                        logger.severe("Couldn't close SVDRP connection");
+                    }
+                }
+            }
         }
         pm.setMessage(localizer.msg("success","Successfully retrieved data from VDR"));
     }
 
-    private MutableChannelDayProgram[] parseData(String data, Channel channel,
-            Date date, int dateCount) {
-
-        ArrayList dayProgramList = new ArrayList();
+    private MutableChannelDayProgram[] parseData(String data, Channel channel, Date date, int dateCount) {
+        List<MutableChannelDayProgram> dayProgramList = new ArrayList<MutableChannelDayProgram>();
         MutableChannelDayProgram dayProgram = null;
         MutableProgram program = null;
-        Calendar start = date.getCalendar();
-        Calendar stop = date.getCalendar();
-        stop.add(Calendar.DAY_OF_MONTH, dateCount - 1);
-        int currentDay = -1;
-        boolean dayOK = false;
+        
+        List<EPGEntry> entries = EPGParser.parse(data);
+        for (int i = 0; i < dateCount; i++) {
+            Calendar start = date.getCalendar();
+            start .add(Calendar.DAY_OF_MONTH, i);
+            Calendar stop = date.getCalendar();
+            stop .add(Calendar.DAY_OF_MONTH, i + 1);
+            Date currentDate = new Date(start);
+            logger.fine("Parsing program for " + channel.getName() + " from " + 
+                    DateFormat.getDateTimeInstance().format(start.getTime()) + 
+                    " to " +
+                    DateFormat.getDateTimeInstance().format(stop.getTime()));
 
-        StringTokenizer st = new StringTokenizer(data, "\n");
-        while (st.hasMoreTokens()) {
-            String line = st.nextToken();
-            if (line.startsWith("E ")) {
-                String[] parts = line.split(" ");
-                int startTime = Integer.parseInt(parts[2]);
-                java.util.Date d = new java.util.Date(startTime * 1000L);
-                Calendar progTime = Calendar.getInstance();
-                progTime.setTimeInMillis(d.getTime());
-                if (currentDay != progTime.get(Calendar.DAY_OF_MONTH)) {
-                    if (dayProgram != null) {
-                        dayProgramList.add(dayProgram);
-                    }
-                    dayProgram = new MutableChannelDayProgram(
-                            new Date(progTime), channel);
-                    currentDay = progTime.get(Calendar.DAY_OF_MONTH);
+            dayProgram = new MutableChannelDayProgram(currentDate, channel);
+            for (EPGEntry entry : entries) {
+                if ((entry.getStartTime().after(start) && entry.getEndTime().before(stop))
+                        || entry.getStartTime().get(Calendar.DAY_OF_MONTH) == start.get(Calendar.DAY_OF_MONTH)) {
+                    program = new MutableProgram(channel, new Date(entry.getStartTime()), 
+                            entry.getStartTime().get(Calendar.HOUR_OF_DAY), 
+                            entry.getStartTime().get(Calendar.MINUTE), false);
+                    program.setTitle(entry.getTitle());
+                    program.setShortInfo(entry.getDescription());
+                    program.setDescription(entry.getDescription());
+                    dayProgram.addProgram(program);
                 }
-
-                if ((progTime.after(start) && progTime.before(stop))
-                        || progTime.get(Calendar.DAY_OF_MONTH) == start
-                                .get(Calendar.DAY_OF_MONTH)) {
-                    program = new MutableProgram(channel, new Date(progTime),
-                            progTime.get(Calendar.HOUR_OF_DAY), 
-                            progTime.get(Calendar.MINUTE), false);
-                    dayOK = true;
-                } else {
-                    continue;
-                }
-
-            } else if (line.startsWith("D ") && dayOK) {
-                program.setDescription(line.substring(2));
-                program.setShortInfo(line.substring(2));
-            } else if (line.startsWith("T ") && dayOK) {
-                program.setTitle(line.substring(2));
-            } else if (line.startsWith("e") && dayOK) {
-                dayProgram.addProgram(program);
-                dayOK = false;
             }
+            dayProgramList.add(dayProgram);
         }
-
+        
         MutableChannelDayProgram[] progs = new MutableChannelDayProgram[] {};
         progs = (MutableChannelDayProgram[]) dayProgramList.toArray(progs);
         return progs;
@@ -363,6 +374,6 @@ public class VDRDataService extends AbstractTvDataService {
 	public void setWorkingDirectory(File dataDir) {}
 
 	public static Version getVersion() {
-		return new Version(0,21);
+		return new Version(0,30);
 	}
 }
