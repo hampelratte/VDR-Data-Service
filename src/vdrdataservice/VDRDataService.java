@@ -62,7 +62,7 @@ public class VDRDataService extends AbstractTvDataService {
 
     private PluginInfo pluginInfo = new PluginInfo(
     		VDRDataService.class,
-    		"VDRDataService",
+    		"VDR DataService",
     		localizer.msg("desc", "Loads the EPG-Data from VDR (by Klaus Schmidinger) into TV-Browser"),
             "Henrik Niehaus (hampelratte@users.sf.net)");
     
