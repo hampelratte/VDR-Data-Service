@@ -43,7 +43,7 @@ import devplugin.ProgressMonitor;
 import devplugin.Version;
 
 /**
- * @author <a href="hampelratte@users.sf.net>hampelratte@users.sf.net </a>
+ * @author <a href="hampelratte@users.sf.net">hampelratte@users.sf.net </a>
  * 
  */
 public class VDRDataService extends AbstractTvDataService {
