@@ -24,6 +24,7 @@ import org.hampelratte.svdrp.commands.LSTC;
 import org.hampelratte.svdrp.commands.LSTE;
 import org.hampelratte.svdrp.responses.highlevel.DVBChannel;
 import org.hampelratte.svdrp.responses.highlevel.EPGEntry;
+import org.hampelratte.svdrp.responses.highlevel.PvrInputChannel;
 import org.hampelratte.svdrp.util.ChannelParser;
 import org.hampelratte.svdrp.util.EPGParser;
 
@@ -317,25 +318,20 @@ public class VDRDataService extends AbstractTvDataService {
                     List channelList = new ArrayList();
                     for (Iterator iterator = vdrChannelList.iterator(); iterator.hasNext();) {
                         org.hampelratte.svdrp.responses.highlevel.Channel c = (org.hampelratte.svdrp.responses.highlevel.Channel) iterator.next();
-                        DVBChannel vdrChan = null;
-                        if (c instanceof DVBChannel) {
-                            vdrChan = (DVBChannel) c;
-                        } else {
-                            continue;
-                        }
-                        
+
                         int maxChannel = Integer.parseInt(props.getProperty("max.channel.number"));
-                        if (maxChannel == 0 || maxChannel > 0 && vdrChan.getChannelNumber() <= maxChannel) {
+                        if (maxChannel == 0 || maxChannel > 0 && c.getChannelNumber() <= maxChannel) {
                             // distinguish between radio and tv channels /
                             // pay-tv
-                            int category = getChannelCategory(vdrChan);
+                            int category = getChannelCategory(c);
                             // create a new tvbrowser channel object
-                            Channel chan = new Channel(this, vdrChan.getName(), Integer.toString(vdrChan.getChannelNumber()), TimeZone.getDefault(), "de", "", "", cg, null, category, vdrChan.getName());
+                            Channel chan = new Channel(this, c.getName(), Integer.toString(c.getChannelNumber()), TimeZone.getDefault(), "de", "", "", cg, null, category, c.getName());
                             channelList.add(chan);
                         }
                     }
 
                     // convert channel list to an array
+                    channels = new Channel[channelList.size()];
                     channels = (Channel[]) channelList.toArray(channels);
 
                 } catch (NumberFormatException e) {
@@ -350,17 +346,24 @@ public class VDRDataService extends AbstractTvDataService {
         }
     }
     
-    private int getChannelCategory(DVBChannel chan) {
-    	String vpid = chan.getVPID();
-    	if("0".equals(vpid) || "1".equals(vpid)) { // a radio station
-    		return Channel.CATEGORY_RADIO;
-    	} else { // a tv channel
-    		if(!"0".equals(chan.getConditionalAccess())) {
-    			return Channel.CATEGORY_TV | Channel.CATEGORY_PAY_TV;
-    		} else {
-    			return Channel.CATEGORY_TV | Channel.CATEGORY_DIGITAL;
-    		}
-    	}
+    private int getChannelCategory(org.hampelratte.svdrp.responses.highlevel.Channel c) {
+        if(c instanceof DVBChannel) {
+            DVBChannel chan = (DVBChannel) c;
+        	String vpid = chan.getVPID();
+        	if("0".equals(vpid) || "1".equals(vpid)) { // a radio station
+        		return Channel.CATEGORY_RADIO;
+        	} else { // a tv channel
+        		if(!"0".equals(chan.getConditionalAccess())) {
+        			return Channel.CATEGORY_TV | Channel.CATEGORY_PAY_TV;
+        		} else {
+        			return Channel.CATEGORY_TV | Channel.CATEGORY_DIGITAL;
+        		}
+        	}
+        } else if (c instanceof PvrInputChannel) {
+            return Channel.CATEGORY_TV;
+        } else {
+            return Channel.CATEGORY_NONE;
+        }
     }
 
     public ChannelGroup[] checkForAvailableChannelGroups(ProgressMonitor arg0) throws TvBrowserException {
@@ -374,6 +377,6 @@ public class VDRDataService extends AbstractTvDataService {
 	public void setWorkingDirectory(File dataDir) {}
 
 	public static Version getVersion() {
-		return new Version(0,40);
+		return new Version(0,50);
 	}
 }
