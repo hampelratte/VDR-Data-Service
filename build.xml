@@ -18,8 +18,7 @@
 	<target name="compile" depends="clean">
 		<mkdir dir="${build.dir}"/>
 		<mkdir dir="${classes.dir}" />
-		<javac srcdir="${src.dir}" destdir="${classes.dir}" deprecation="true"
-			debug="true" debuglevel="lines">
+		<javac srcdir="${src.dir}" destdir="${classes.dir}" deprecation="true" debug="true" debuglevel="lines">
 			<classpath>
 				<pathelement location="${tvbrowser.runtime.dir}/tvbrowser.jar" />
 				<pathelement location="${lib.dir}/svdrp4j.jar" />
@@ -34,6 +33,8 @@
 	<target name="jar" depends="compile">
 		<mkdir dir="${classes.dir}/vdrdataservice" />
 		<unjar src="${lib.dir}/svdrp4j.jar" dest="${classes.dir}"/>
+		<unjar src="${lib.dir}/slf4j-api-1.5.0.jar" dest="${classes.dir}"/>
+		<unjar src="${lib.dir}/slf4j-jdk14-1.5.0.jar" dest="${classes.dir}"/>
 		<copy todir="${classes.dir}/vdrdataservice">
 		      <fileset dir="${res.dir}/language" includes="**/*.properties"/>
         </copy>
