@@ -377,6 +377,6 @@ public class VDRDataService extends AbstractTvDataService {
 	public void setWorkingDirectory(File dataDir) {}
 
 	public static Version getVersion() {
-		return new Version(0,50);
+		return new Version(0,51);
 	}
 }
