@@ -22,11 +22,12 @@ import org.hampelratte.svdrp.Connection;
 import org.hampelratte.svdrp.Response;
 import org.hampelratte.svdrp.commands.LSTC;
 import org.hampelratte.svdrp.commands.LSTE;
+import org.hampelratte.svdrp.parsers.ChannelParser;
+import org.hampelratte.svdrp.parsers.EPGParser;
 import org.hampelratte.svdrp.responses.highlevel.DVBChannel;
 import org.hampelratte.svdrp.responses.highlevel.EPGEntry;
 import org.hampelratte.svdrp.responses.highlevel.PvrInputChannel;
-import org.hampelratte.svdrp.util.ChannelParser;
-import org.hampelratte.svdrp.util.EPGParser;
+
 
 import tvdataservice.MutableChannelDayProgram;
 import tvdataservice.MutableProgram;
@@ -129,7 +130,7 @@ public class VDRDataService extends AbstractTvDataService {
         MutableChannelDayProgram dayProgram = null;
         MutableProgram program = null;
         
-        List<EPGEntry> entries = EPGParser.parse(data);
+        List<EPGEntry> entries = new EPGParser().parse(data);
         for (int i = 0; i < dateCount; i++) {
             Calendar start = date.getCalendar();
             start .add(Calendar.DAY_OF_MONTH, i);
@@ -377,6 +378,6 @@ public class VDRDataService extends AbstractTvDataService {
 	public void setWorkingDirectory(File dataDir) {}
 
 	public static Version getVersion() {
-		return new Version(0,51);
+		return new Version(0,52);
 	}
 }
