@@ -181,8 +181,8 @@ public class VDRDataService extends AbstractTvDataService {
         props.setProperty("max.channel.number", "100");
 
         // overwrite defaults with values from configfile
-        ArrayList list = new ArrayList();
-        Enumeration en = p.keys();
+        List<Channel> list = new ArrayList<Channel>();
+        Enumeration<?> en = p.keys();
         while (en.hasMoreElements()) {
             String key = (String) en.nextElement();
             props.setProperty(key, p.getProperty(key));
@@ -215,7 +215,7 @@ public class VDRDataService extends AbstractTvDataService {
             }
         }
 
-        channels = (Channel[])list.toArray(channels);
+        channels = list.toArray(channels);
 
         VDRConnection.host = props.getProperty("vdr.host");
         VDRConnection.port = Integer.parseInt(props.getProperty("vdr.port"));
@@ -273,7 +273,7 @@ public class VDRDataService extends AbstractTvDataService {
     }
 
     private void sweepOffChannelsFromProps() {
-        for (Iterator iterator = props.keySet().iterator(); iterator.hasNext();) {
+        for (Iterator<?> iterator = props.keySet().iterator(); iterator.hasNext();) {
             String key = (String) iterator.next();
             if(key.startsWith("CHANNEL")) {
                 iterator.remove();
@@ -333,9 +333,9 @@ public class VDRDataService extends AbstractTvDataService {
                 try {
                     // parse the channel list
                     List<org.hampelratte.svdrp.responses.highlevel.Channel> vdrChannelList = ChannelParser.parse(res.getMessage(), false);
-                    List channelList = new ArrayList();
-                    for (Iterator iterator = vdrChannelList.iterator(); iterator.hasNext();) {
-                        org.hampelratte.svdrp.responses.highlevel.Channel c = (org.hampelratte.svdrp.responses.highlevel.Channel) iterator.next();
+                    List<Channel> channelList = new ArrayList<Channel>();
+                    for (Iterator<org.hampelratte.svdrp.responses.highlevel.Channel> iterator = vdrChannelList.iterator(); iterator.hasNext();) {
+                        org.hampelratte.svdrp.responses.highlevel.Channel c = iterator.next();
 
                         int maxChannel = Integer.parseInt(props.getProperty("max.channel.number"));
                         if (maxChannel == 0 || maxChannel > 0 && c.getChannelNumber() <= maxChannel) {
@@ -350,7 +350,7 @@ public class VDRDataService extends AbstractTvDataService {
 
                     // convert channel list to an array
                     channels = new Channel[channelList.size()];
-                    channels = (Channel[]) channelList.toArray(channels);
+                    channels = channelList.toArray(channels);
 
                 } catch (NumberFormatException e) {
                     logger.severe(e.getMessage());
