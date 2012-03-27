@@ -13,7 +13,7 @@
 	<property name="classes.dir" value="${build.dir}/classes" />
 	<property name="res.dir" value="res" />
 	<property name="jar.file" value="${tvbrowser.runtime.dir}/plugins/VDRDataService.jar"/>
-
+	<property name="lib.dir" value="lib" />
 
 	<target name="compile" depends="clean">
 		<mkdir dir="${build.dir}"/>
@@ -21,7 +21,9 @@
 		<javac srcdir="${src.dir}" destdir="${classes.dir}" deprecation="true" debug="true" debuglevel="lines">
 			<classpath>
 				<pathelement location="${tvbrowser.runtime.dir}/tvbrowser.jar" />
-				<pathelement location="${lib.dir}/svdrp4j-1.0.0.jar" />
+				<fileset dir="${lib.dir}">
+                    <include name="*.jar" />
+                </fileset>
 			</classpath>
 		</javac>
 	</target>
@@ -32,9 +34,9 @@
 	
 	<target name="jar" depends="compile">
 		<mkdir dir="${classes.dir}/vdrdataservice" />
-		<unjar src="${lib.dir}/svdrp4j-1.0.0.jar" dest="${classes.dir}"/>
+		<unjar src="${lib.dir}/svdrp4j-1.1.0-SNAPSHOT.jar" dest="${classes.dir}"/>
 		<unjar src="${lib.dir}/slf4j-api-1.5.0.jar" dest="${classes.dir}"/>
-		<unjar src="${lib.dir}/slf4j-jdk14-1.5.0.jar" dest="${classes.dir}"/>
+        <unjar src="${lib.dir}/slf4j-jdk14-1.5.0.jar" dest="${classes.dir}"/>
 		<copy todir="${classes.dir}/vdrdataservice">
 		      <fileset dir="${res.dir}/language" includes="**/*.properties"/>
         </copy>
