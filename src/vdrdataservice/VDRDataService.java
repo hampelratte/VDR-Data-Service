@@ -2,7 +2,6 @@ package vdrdataservice;
 
 import java.io.File;
 import java.io.IOException;
-import java.text.DateFormat;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -12,7 +11,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.TimeZone;
-import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -26,7 +24,12 @@ import org.hampelratte.svdrp.parsers.ChannelParser;
 import org.hampelratte.svdrp.parsers.EPGParser;
 import org.hampelratte.svdrp.responses.highlevel.DVBChannel;
 import org.hampelratte.svdrp.responses.highlevel.EPGEntry;
+import org.hampelratte.svdrp.responses.highlevel.Genre;
 import org.hampelratte.svdrp.responses.highlevel.PvrInputChannel;
+import org.hampelratte.svdrp.responses.highlevel.Stream;
+import org.hampelratte.svdrp.responses.highlevel.Stream.CONTENT;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import tvdataservice.MutableChannelDayProgram;
 import tvdataservice.MutableProgram;
@@ -40,6 +43,8 @@ import devplugin.ChannelGroup;
 import devplugin.ChannelGroupImpl;
 import devplugin.Date;
 import devplugin.PluginInfo;
+import devplugin.Program;
+import devplugin.ProgramFieldType;
 import devplugin.ProgressMonitor;
 import devplugin.Version;
 
@@ -49,7 +54,7 @@ import devplugin.Version;
  */
 public class VDRDataService extends AbstractTvDataService {
 
-    private static Logger logger = Logger.getLogger(VDRDataService.class.getName());
+    private static transient Logger logger = LoggerFactory.getLogger(VDRDataService.class);
 
     private final Localizer localizer = Localizer.getLocalizerFor(VDRDataService.class);
 
@@ -61,42 +66,36 @@ public class VDRDataService extends AbstractTvDataService {
 
     private final ChannelGroup cg = new ChannelGroupImpl("vdr", "VDR", "Channels from VDR", "VDR");
 
-    private final PluginInfo pluginInfo = new PluginInfo(
-            VDRDataService.class,
-            "VDR DataService",
-            localizer.msg("desc", "Loads the EPG-Data from VDR (by Klaus Schmidinger) into TV-Browser"),
-            "Henrik Niehaus (hampelratte@users.sf.net)");
-
+    private final PluginInfo pluginInfo = new PluginInfo(VDRDataService.class, "VDR DataService", localizer.msg("desc",
+            "Loads the EPG-Data from VDR (by Klaus Schmidinger) into TV-Browser"), "Henrik Niehaus (hampelratte@users.sf.net)");
 
     @Override
-    public void updateTvData(TvDataUpdateManager database, Channel[] channels,
-            devplugin.Date date, int dateCount, ProgressMonitor pm)
-                    throws TvBrowserException {
+    public void updateTvData(TvDataUpdateManager database, Channel[] channels, devplugin.Date date, int dateCount, ProgressMonitor pm)
+            throws TvBrowserException {
 
         pm.setMaximum(channels.length);
-        if(channels.length > 0) {
+        if (channels.length > 0) {
             Connection conn = null;
             try {
                 conn = new Connection(VDRConnection.host, VDRConnection.port, 500, VDRConnection.charset);
                 for (int i = 0; i < channels.length; i++) {
-                    //pm.setMessage(localizer.msg("getting_data","Getting data from VDR for " + channels[i].getName()));
                     pm.setMessage(localizer.msg("getting_data", "Getting data from VDR for {0}", channels[i].getName()));
                     Response res = conn.send(new LSTE(channels[i].getId(), ""));
                     if (res != null && res.getCode() == 215) {
                         String data = res.getMessage();
-                        pm.setMessage(localizer.msg("parsing_data","Parsing data"));
+                        pm.setMessage(localizer.msg("parsing_data", "Parsing data"));
                         MutableChannelDayProgram[] dayPrograms = parseData(data, channels[i], date, dateCount);
-                        pm.setMessage(localizer.msg("updating_database","Updating EPG database"));
+                        pm.setMessage(localizer.msg("updating_database", "Updating EPG database"));
                         for (int j = 0; j < dayPrograms.length; j++) {
-                            if(dayPrograms[j].getProgramCount() > 0) {
-                                logger.info("Adding mutable program: " + dayPrograms[j]);
+                            if (dayPrograms[j].getProgramCount() > 0) {
+                                logger.debug("Adding mutable program: {}", dayPrograms[j]);
                                 database.updateDayProgram(dayPrograms[j]);
                             }
                         }
                     } else {
                         StringBuffer sb = new StringBuffer(channels[i].getName());
                         sb.append(" Error ");
-                        if(res != null) {
+                        if (res != null) {
                             sb.append(res.getCode());
                             sb.append(": ");
                             sb.append(res.getMessage());
@@ -107,22 +106,23 @@ public class VDRDataService extends AbstractTvDataService {
                     pm.setValue(i);
                 }
             } catch (Exception e) {
-                logger.severe(e.getLocalizedMessage());
-                JOptionPane.showMessageDialog(getParentFrame(),
+                logger.error("Error while updating the EPG", e);
+                JOptionPane.showMessageDialog(
+                        getParentFrame(),
                         localizer.msg("couldnt_connect", "<html>Couldn't connect to VDR<br>{0}</html>",
-                                e.getClass().getSimpleName() + ": " + e.getLocalizedMessage()),
-                                Localizer.getLocalization(Localizer.I18N_ERROR), JOptionPane.ERROR_MESSAGE);
+                                e.getClass().getSimpleName() + ": " + e.getLocalizedMessage()), Localizer.getLocalization(Localizer.I18N_ERROR),
+                                JOptionPane.ERROR_MESSAGE);
             } finally {
-                if(conn != null) {
+                if (conn != null) {
                     try {
                         conn.close();
                     } catch (IOException e) {
-                        logger.severe("Couldn't close SVDRP connection");
+                        logger.error("Couldn't close SVDRP connection");
                     }
                 }
             }
         }
-        pm.setMessage(localizer.msg("success","Successfully retrieved data from VDR"));
+        pm.setMessage(localizer.msg("success", "Successfully retrieved data from VDR"));
     }
 
     private MutableChannelDayProgram[] parseData(String data, Channel channel, Date date, int dateCount) {
@@ -130,6 +130,7 @@ public class VDRDataService extends AbstractTvDataService {
         MutableChannelDayProgram dayProgram = null;
         MutableProgram program = null;
 
+        // parse the data
         List<EPGEntry> entries = new EPGParser().parse(data);
         for (int i = 0; i < dateCount; i++) {
             Calendar start = date.getCalendar();
@@ -143,24 +144,12 @@ public class VDRDataService extends AbstractTvDataService {
             stop.set(Calendar.MINUTE, 0);
             stop.set(Calendar.SECOND, 0);
             Date currentDate = new Date(start);
-            logger.fine("##############################\nParsing program for " + channel.getName() + " from "
-                    +
-                    DateFormat.getDateTimeInstance().format(start.getTime()) +
-                    " to " +
-                    DateFormat.getDateTimeInstance().format(stop.getTime()));
-
             dayProgram = new MutableChannelDayProgram(currentDate, channel);
             for (EPGEntry entry : entries) {
                 if ((entry.getStartTime().after(start) && entry.getEndTime().before(stop))
                         || entry.getStartTime().get(Calendar.DAY_OF_MONTH) == start.get(Calendar.DAY_OF_MONTH)) {
-                    program = new MutableProgram(channel, new Date(entry.getStartTime()),
-                            entry.getStartTime().get(Calendar.HOUR_OF_DAY),
-                            entry.getStartTime().get(Calendar.MINUTE), false);
-                    program.setTitle(entry.getTitle());
-                    program.setShortInfo(entry.getDescription());
-                    program.setDescription(entry.getDescription());
+                    program = entryToProgram(channel, entry);
                     dayProgram.addProgram(program);
-                    logger.fine("Program: " + entry.getTitle() + " " + entry.getStartTime().getTime() + "-" + entry.getEndTime().getTime());
                 }
             }
             dayProgramList.add(dayProgram);
@@ -171,6 +160,137 @@ public class VDRDataService extends AbstractTvDataService {
         return progs;
     }
 
+    private MutableProgram entryToProgram(Channel channel, EPGEntry entry) {
+        MutableProgram program = new MutableProgram(channel, new Date(entry.getStartTime()), entry.getStartTime().get(Calendar.HOUR_OF_DAY), entry
+                .getStartTime().get(Calendar.MINUTE), false);
+
+        // set the title
+        program.setTitle(entry.getTitle());
+
+        // set the description
+        program.setDescription(entry.getDescription());
+
+        // set the short info, if available
+        if (entry.getShortText() != null && !entry.getShortText().trim().isEmpty()) {
+            program.setShortInfo(entry.getShortText());
+        }
+
+        // this field accumulates different info flags, which will show up as small icons
+        // flags are compined by OR-ing the different values
+        int infoBits = 0;
+
+        // set the genre, if available
+        if (entry.getGenres().size() > 0) {
+            // possible TVB categories
+            // Program.INFO_CATEGORIE_ARTS
+            // Program.INFO_CATEGORIE_CHILDRENS
+            // Program.INFO_CATEGORIE_DOCUMENTARY
+            // Program.INFO_CATEGORIE_MAGAZINE_INFOTAINMENT
+            // Program.INFO_CATEGORIE_MOVIE
+            // Program.INFO_CATEGORIE_NEWS
+            // Program.INFO_CATEGORIE_OTHERS
+            // Program.INFO_CATEGORIE_SERIES
+            // Program.INFO_CATEGORIE_SHOW
+            // Program.INFO_CATEGORIE_SPORTS
+
+            for (Genre genre : entry.getGenres()) {
+                int code = genre.getCode();
+                if (code >= 0x10 && code <= 0x1F) {
+                    infoBits |= Program.INFO_CATEGORIE_MOVIE;
+                    if (code == 0x15) {
+                        infoBits |= Program.INFO_CATEGORIE_SERIES;
+                    }
+                } else if (code >= 0x20 && code <= 0x2F) {
+                    infoBits |= Program.INFO_CATEGORIE_NEWS;
+                } else if (code >= 0x30 && code <= 0x3F) {
+                    infoBits |= Program.INFO_CATEGORIE_SHOW;
+                } else if (code >= 0x40 && code <= 0x4F) {
+                    infoBits |= Program.INFO_CATEGORIE_SPORTS;
+                } else if (code >= 0x50 && code <= 0x5F) {
+                    infoBits |= Program.INFO_CATEGORIE_CHILDRENS;
+                } else if (code >= 0x70 && code <= 0x7F) {
+                    infoBits |= Program.INFO_CATEGORIE_ARTS;
+                } else if (code >= 0x90 && code <= 0xAF) {
+                    infoBits |= Program.INFO_CATEGORIE_MAGAZINE_INFOTAINMENT;
+                }
+            }
+
+        }
+
+        // analyze the available streams and set the format informations
+        if (entry.getStreams().size() > 0) {
+            for (Stream stream : entry.getStreams()) {
+                if (stream.getContent() == CONTENT.H264) {
+                    if (stream.getType() >= 0x0B && stream.getType() <= 0x10) {
+                        infoBits |= Program.INFO_VISION_HD;
+                    }
+                    switch (stream.getType()) {
+                    case 0x01:
+                    case 0x05:
+                        infoBits |= Program.INFO_VISION_4_TO_3;
+                        break;
+                    case 0x03:
+                    case 0x04:
+                    case 0x07:
+                    case 0x08:
+                    case 0x0B:
+                    case 0x0C:
+                    case 0x0F:
+                    case 0x10:
+                        infoBits |= Program.INFO_VISION_16_TO_9;
+                        break;
+                    default:
+                        break;
+                    }
+                } else if (stream.getContent() == CONTENT.MP2V) {
+                    if (stream.getType() >= 0x09 && stream.getType() <= 0x10) {
+                        infoBits |= Program.INFO_VISION_HD;
+                    }
+                    switch (stream.getType()) {
+                    case 0x01:
+                    case 0x05:
+                    case 0x09:
+                    case 0x0D:
+                        infoBits |= Program.INFO_VISION_4_TO_3;
+                        break;
+                    case 0x02:
+                    case 0x03:
+                    case 0x04:
+                    case 0x06:
+                    case 0x07:
+                    case 0x08:
+                    case 0x0A:
+                    case 0x0B:
+                    case 0x0C:
+                    case 0x0E:
+                    case 0x0F:
+                    case 0x10:
+                        infoBits |= Program.INFO_VISION_16_TO_9;
+                        break;
+                    default:
+                        break;
+                    }
+                } else if (stream.getContent() == CONTENT.MP2A) {
+                    if (stream.getType() == 0x03) {
+                        infoBits |= Program.INFO_AUDIO_STEREO;
+                    }
+                    if (stream.getType() == 0x01) {
+                        infoBits |= Program.INFO_AUDIO_MONO;
+                    }
+                } else if (stream.getContent() == CONTENT.AC3) {
+                    if (stream.getType() == 0x44) {
+                        infoBits |= Program.INFO_AUDIO_DOLBY_DIGITAL_5_1;
+                    }
+                } else if (stream.getContent() == CONTENT.SUBTITLE && stream.getType() >= 0x20 && stream.getType() <= 0x24) {
+                    infoBits |= Program.INFO_SUBTITLE_FOR_AURALLY_HANDICAPPED;
+                }
+            }
+
+            program.setIntField(ProgramFieldType.INFO_TYPE, infoBits);
+        }
+
+        return program;
+    }
 
     @Override
     public void loadSettings(Properties p) {
@@ -190,26 +310,27 @@ public class VDRDataService extends AbstractTvDataService {
 
         // create channel[]
         en = props.keys();
-        while(en.hasMoreElements()) {
-            String key = (String)(en.nextElement());
-            if(key.startsWith("CHANNELID")) {
+        while (en.hasMoreElements()) {
+            String key = (String) (en.nextElement());
+            if (key.startsWith("CHANNELID")) {
                 String id = getChannelID(key);
-                if(!id.equals("")) {
-                    String channelID = props.getProperty("CHANNELID"+id);
-                    String name = props.getProperty("CHANNELNAME"+id);
-                    name = name == null ? "Channel("+id+")" : name;
-                    String url = props.getProperty("CHANNELURL"+id);
+                if (!id.equals("")) {
+                    String channelID = props.getProperty("CHANNELID" + id);
+                    String name = props.getProperty("CHANNELNAME" + id);
+                    name = name == null ? "Channel(" + id + ")" : name;
+                    String url = props.getProperty("CHANNELURL" + id);
                     url = url == null ? "" : url;
-                    String country = props.getProperty("CHANNELCOUNTRY"+id);
+                    String country = props.getProperty("CHANNELCOUNTRY" + id);
                     country = country == null ? Locale.getDefault().getCountry() : country;
-                    String copy = props.getProperty("CHANNELCOPYRIGHT"+id);
+                    String copy = props.getProperty("CHANNELCOPYRIGHT" + id);
                     int category = 0;
                     try {
-                        category = Integer.parseInt(props.getProperty("CHANNELCATEGORY"+id));
-                    } catch (NumberFormatException e) {}
+                        category = Integer.parseInt(props.getProperty("CHANNELCATEGORY" + id));
+                    } catch (NumberFormatException e) {
+                    }
                     copy = copy == null ? "" : copy;
                     Channel chan = new Channel(this, name, channelID, TimeZone.getDefault(), "de", "", "", cg, null, category);
-                    //new Channel(this, name, channelID, TimeZone.getDefault(), country, copy, "", cg);
+                    // new Channel(this, name, channelID, TimeZone.getDefault(), country, copy, "", cg);
                     list.add(chan);
                 }
             }
@@ -222,7 +343,6 @@ public class VDRDataService extends AbstractTvDataService {
         VDRConnection.charset = props.getProperty("charset") == null ? "ISO-8859-1" : props.getProperty("charset");
     }
 
-
     public String getProperty(String key) {
         return props.getProperty(key);
     }
@@ -234,7 +354,7 @@ public class VDRDataService extends AbstractTvDataService {
     private String getChannelID(String s) {
         Pattern p = Pattern.compile("^([A-Z]+)(\\d+)$");
         Matcher m = p.matcher(s);
-        if(m.matches()) {
+        if (m.matches()) {
             String id = m.group(2);
             return id;
         }
@@ -258,15 +378,13 @@ public class VDRDataService extends AbstractTvDataService {
                 props.setProperty("CHANNELURL" + i, channels[i].getWebpage());
             }
             if (channels[i].getCountry() != null) {
-                props.setProperty("CHANNELCOUNTRY" + i, channels[i]
-                        .getCountry());
+                props.setProperty("CHANNELCOUNTRY" + i, channels[i].getCountry());
             }
 
-            props.setProperty("CHANNELCATEGORY" + i, ""+channels[i].getCategories());
+            props.setProperty("CHANNELCATEGORY" + i, "" + channels[i].getCategories());
 
             if (channels[i].getCopyrightNotice() != null) {
-                props.setProperty("CHANNELCOPYRIGHT" + i, channels[i]
-                        .getCopyrightNotice());
+                props.setProperty("CHANNELCOPYRIGHT" + i, channels[i].getCopyrightNotice());
             }
         }
         return props;
@@ -275,7 +393,7 @@ public class VDRDataService extends AbstractTvDataService {
     private void sweepOffChannelsFromProps() {
         for (Iterator<?> iterator = props.keySet().iterator(); iterator.hasNext();) {
             String key = (String) iterator.next();
-            if(key.startsWith("CHANNEL")) {
+            if (key.startsWith("CHANNEL")) {
                 iterator.remove();
             }
         }
@@ -288,7 +406,7 @@ public class VDRDataService extends AbstractTvDataService {
 
     @Override
     public SettingsPanel getSettingsPanel() {
-        if(settingsPanel == null) {
+        if (settingsPanel == null) {
             settingsPanel = new VDRDataServiceSettingsPanel();
             settingsPanel.setVdrDataService(this);
             settingsPanel.loadSettings();
@@ -308,14 +426,13 @@ public class VDRDataService extends AbstractTvDataService {
 
     @Override
     public ChannelGroup[] getAvailableGroups() {
-        ChannelGroup[] cgs = new ChannelGroup[] {cg};
+        ChannelGroup[] cgs = new ChannelGroup[] { cg };
         return cgs;
     }
 
-
     @Override
     public Channel[] getAvailableChannels(ChannelGroup cg) {
-        if(cg.equals(this.cg)) {
+        if (cg.equals(this.cg)) {
             logger.info("Returning " + channels.length + " channels");
             return this.channels;
         } else {
@@ -343,7 +460,8 @@ public class VDRDataService extends AbstractTvDataService {
                             // pay-tv
                             int category = getChannelCategory(c);
                             // create a new tvbrowser channel object
-                            Channel chan = new Channel(this, c.getName(), Integer.toString(c.getChannelNumber()), TimeZone.getDefault(), "de", "", "", cg, null, category, c.getName());
+                            Channel chan = new Channel(this, c.getName(), Integer.toString(c.getChannelNumber()), TimeZone.getDefault(), "de", "", "", cg,
+                                    null, category, c.getName());
                             channelList.add(chan);
                         }
                     }
@@ -353,9 +471,9 @@ public class VDRDataService extends AbstractTvDataService {
                     channels = channelList.toArray(channels);
 
                 } catch (NumberFormatException e) {
-                    logger.severe(e.getMessage());
+                    logger.error("Couldn't parse number", e);
                 } catch (ParseException e) {
-                    logger.severe(e.getMessage());
+                    logger.error("Couldn't parse channel list", e);
                 }
             }
             return channels;
@@ -365,13 +483,13 @@ public class VDRDataService extends AbstractTvDataService {
     }
 
     private int getChannelCategory(org.hampelratte.svdrp.responses.highlevel.Channel c) {
-        if(c instanceof DVBChannel) {
+        if (c instanceof DVBChannel) {
             DVBChannel chan = (DVBChannel) c;
             String vpid = chan.getVPID();
-            if("0".equals(vpid) || "1".equals(vpid)) { // a radio station
+            if ("0".equals(vpid) || "1".equals(vpid)) { // a radio station
                 return Channel.CATEGORY_RADIO;
             } else { // a tv channel
-                if(!"0".equals(chan.getConditionalAccess())) {
+                if (!"0".equals(chan.getConditionalAccess())) {
                     return Channel.CATEGORY_TV | Channel.CATEGORY_PAY_TV;
                 } else {
                     return Channel.CATEGORY_TV | Channel.CATEGORY_DIGITAL;
@@ -395,7 +513,8 @@ public class VDRDataService extends AbstractTvDataService {
     }
 
     @Override
-    public void setWorkingDirectory(File dataDir) {}
+    public void setWorkingDirectory(File dataDir) {
+    }
 
     public static Version getVersion() {
         return new Version(0, 54);
