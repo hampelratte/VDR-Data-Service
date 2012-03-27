@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 
 <project name="VDRDataService" default="run" basedir=".">
-    <property file="build.properties"/>
-	
+	<property file="build.properties"/>
+
 	<property name="tvbrowser.lib.dir" value="${tvbrowser.dir}/lib" />
 	<property name="tvbrowser.src.dir" value="${tvbrowser.dir}/src" />
 
@@ -16,51 +16,55 @@
 
 
 	<target name="compile" depends="clean">
-		<mkdir dir="${build.dir}"/>
+		<mkdir dir="${build.dir}" />
 		<mkdir dir="${classes.dir}" />
 		<javac srcdir="${src.dir}" destdir="${classes.dir}" deprecation="true" debug="true" debuglevel="lines">
 			<classpath>
 				<pathelement location="${tvbrowser.runtime.dir}/tvbrowser.jar" />
-				<pathelement location="${lib.dir}/svdrp4j-1.0.0.jar" />
+				<fileset dir="${lib.dir}">
+					<include name="*.jar" />
+				</fileset>
 			</classpath>
 		</javac>
 	</target>
-	
+
 	<target name="clean">
-		<delete dir="${build.dir}"/>
+		<delete dir="${build.dir}" />
 	</target>
-	
+
 	<target name="jar" depends="compile">
 		<mkdir dir="${classes.dir}/vdrdataservice" />
-		<unjar src="${lib.dir}/svdrp4j-1.0.0.jar" dest="${classes.dir}"/>
-		<unjar src="${lib.dir}/slf4j-api-1.5.0.jar" dest="${classes.dir}"/>
-		<unjar src="${lib.dir}/slf4j-jdk14-1.5.0.jar" dest="${classes.dir}"/>
+		<unjar dest="${classes.dir}">
+			<fileset dir="${lib.dir}">
+				<include name="*.jar" />
+			</fileset>
+		</unjar>
 		<copy todir="${classes.dir}/vdrdataservice">
-		      <fileset dir="${res.dir}/language" includes="**/*.properties"/>
-        </copy>
+			<fileset dir="${res.dir}/language" includes="**/*.properties" />
+		</copy>
 		<jar destfile="${jar.file}" basedir="${classes.dir}">
 		</jar>
 	</target>
-	
+
 	<target name="dist" depends="jar" description="Make distribution zip">
-        <property name="dist-tmp.dir" value="${build.dir}/dist-tmp"/>        
-        <mkdir dir="${dist-tmp.dir}"/>
-        
-        <delete>
-            <fileset dir="${build.dir}" includes="*.zip"/>
-        </delete>
-        
-        <copy file="${jar.file}" todir="${dist-tmp.dir}/${ant.project.name}-${version}/"/>
-        <copy todir="${dist-tmp.dir}/${ant.project.name}-${version}">
-            <fileset dir="${doc.dir}">
-            </fileset>
-        </copy>
-        
-        <zip destfile="${build.dir}/${ant.project.name}-${version}.zip" 
+		<property name="dist-tmp.dir" value="${build.dir}/dist-tmp" />
+		<mkdir dir="${dist-tmp.dir}"/>
+
+		<delete>
+			<fileset dir="${build.dir}" includes="*.zip"/>
+		</delete>
+
+		<copy file="${jar.file}" todir="${dist-tmp.dir}/${ant.project.name}-${version}/"/>
+		<copy todir="${dist-tmp.dir}/${ant.project.name}-${version}">
+			<fileset dir="${doc.dir}">
+			</fileset>
+		</copy>
+
+		<zip destfile="${build.dir}/${ant.project.name}-${version}.zip" 
              basedir="${dist-tmp.dir}"/>
 
-        <delete dir="${dist-tmp.dir}"/>
-    </target>
+		<delete dir="${dist-tmp.dir}"/>
+	</target>
 
 	<target name="run" depends="jar">
 		<java jar="${tvbrowser.runtime.dir}/tvbrowser.jar" dir="${tvbrowser.runtime.dir}" fork="true">
