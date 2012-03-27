@@ -273,9 +273,10 @@ public class VDRDataService extends AbstractTvDataService {
                 } else if (stream.getContent() == CONTENT.MP2A) {
                     if (stream.getType() == 0x03) {
                         infoBits |= Program.INFO_AUDIO_STEREO;
-                    }
-                    if (stream.getType() == 0x01) {
+                    } else if (stream.getType() == 0x01) {
                         infoBits |= Program.INFO_AUDIO_MONO;
+                    } else if (stream.getType() == 0x40) {
+                        infoBits |= Program.INFO_AUDIO_DESCRIPTION;
                     }
                 } else if (stream.getContent() == CONTENT.AC3) {
                     if (stream.getType() == 0x44) {
