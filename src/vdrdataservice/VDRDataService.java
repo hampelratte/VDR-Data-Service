@@ -3,12 +3,15 @@ package vdrdataservice;
 import java.io.File;
 import java.io.IOException;
 import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
@@ -24,6 +27,7 @@ import org.hampelratte.svdrp.parsers.ChannelParser;
 import org.hampelratte.svdrp.parsers.EPGParser;
 import org.hampelratte.svdrp.responses.highlevel.DVBChannel;
 import org.hampelratte.svdrp.responses.highlevel.EPGEntry;
+import org.hampelratte.svdrp.responses.highlevel.Genre;
 import org.hampelratte.svdrp.responses.highlevel.PvrInputChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,6 +45,7 @@ import devplugin.ChannelGroupImpl;
 import devplugin.Date;
 import devplugin.PluginInfo;
 import devplugin.Program;
+import devplugin.ProgramFieldType;
 import devplugin.ProgressMonitor;
 import devplugin.Version;
 
@@ -77,7 +82,6 @@ public class VDRDataService extends AbstractTvDataService {
             try {
                 conn = new Connection(VDRConnection.host, VDRConnection.port, 500, VDRConnection.charset);
                 for (int i = 0; i < channels.length; i++) {
-                    // pm.setMessage(localizer.msg("getting_data","Getting data from VDR for " + channels[i].getName()));
                     pm.setMessage(localizer.msg("getting_data", "Getting data from VDR for {0}", channels[i].getName()));
                     Response res = conn.send(new LSTE(channels[i].getId(), ""));
                     if (res != null && res.getCode() == 215) {
@@ -87,13 +91,13 @@ public class VDRDataService extends AbstractTvDataService {
                         pm.setMessage(localizer.msg("updating_database", "Updating EPG database"));
                         for (int j = 0; j < dayPrograms.length; j++) {
                             if (dayPrograms[j].getProgramCount() > 0) {
-                                // logger.debug("Adding mutable program: {}", dayPrograms[j]);
+                                logger.debug("Adding mutable program: {}", dayPrograms[j]);
                                 Iterator<Program> it = dayPrograms[j].getPrograms();
                                 while (it.hasNext()) {
                                     Program p = it.next();
-                                    // logger.debug("Adding Program {} {} {}", new Object[] { p.getTitle(), p.getDateString(), p.getTimeString() });
+                                    logger.debug("Adding Program {} {} {}", new Object[] { p.getTitle(), p.getDateString(), p.getTimeString() });
                                 }
-                                // database.updateDayProgram(dayPrograms[j]);
+                                database.updateDayProgram(dayPrograms[j]);
                             }
                         }
                     } else {
@@ -138,8 +142,6 @@ public class VDRDataService extends AbstractTvDataService {
         MutableChannelDayProgram dayProgram = null;
         MutableProgram program = null;
 
-        // Calendar now = Calendar.getInstance();
-
         // parse the data
         List<EPGEntry> entries = new EPGParser().parse(data);
 
@@ -170,25 +172,25 @@ public class VDRDataService extends AbstractTvDataService {
             /*
              * Old data has to be read from disk. Otherwise TVB would not show any data before "now", since VDR only sends the EPG after "now"
              */
-            // if (i <= 1) { // yesterday or today
-            // logger.debug("Looking up old program for {}", start.getTime());
-            // String oldData = epgStore.load(channel, start);
-            // if (oldData != null) {
-            // List<EPGEntry> oldEntries = new EPGParser().parse(oldData);
-            // for (EPGEntry entry : oldEntries) {
-            // if ((entry.getStartTime().after(start) && entry.getEndTime().before(stop))
-            // || entry.getStartTime().get(Calendar.DAY_OF_MONTH) == start.get(Calendar.DAY_OF_MONTH) && entry.getStartTime().before(now)) {
-            //
-            // SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy HH:mm");
-            // logger.debug("Adding old program {} at {} for channel {}",
-            // new Object[] { entry.getTitle(), sdf.format(entry.getStartTime().getTime()), channel.getName() });
-            //
-            // program = entryToProgram(channel, entry);
-            // dayProgram.addProgram(program);
-            // }
-            // }
-            // }
-            // }
+            if (i <= 1) { // yesterday or today
+                logger.debug("Looking up old program for {}", start.getTime());
+                List<EPGEntry> oldEntries = epgStore.load(channel, start);
+                if (oldEntries != null) {
+                    Calendar now = Calendar.getInstance();
+                    for (EPGEntry entry : oldEntries) {
+                        if ((entry.getStartTime().after(start) && entry.getEndTime().before(stop))
+                                || entry.getStartTime().get(Calendar.DAY_OF_MONTH) == start.get(Calendar.DAY_OF_MONTH) && entry.getStartTime().before(now)) {
+
+                            SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy HH:mm");
+                            logger.debug("Adding old program {} at {} for channel {}",
+                                    new Object[] { entry.getTitle(), sdf.format(entry.getStartTime().getTime()), channel.getName() });
+
+                            program = entryToProgram(channel, entry);
+                            dayProgram.addProgram(program);
+                        }
+                    }
+                }
+            }
 
             dayProgramList.add(dayProgram);
         }
@@ -201,9 +203,89 @@ public class VDRDataService extends AbstractTvDataService {
     private MutableProgram entryToProgram(Channel channel, EPGEntry entry) {
         MutableProgram program = new MutableProgram(channel, new Date(entry.getStartTime()), entry.getStartTime().get(Calendar.HOUR_OF_DAY), entry
                 .getStartTime().get(Calendar.MINUTE), false);
+
+        // set the title
         program.setTitle(entry.getTitle());
-        program.setShortInfo(entry.getDescription());
+
+        // set the description
         program.setDescription(entry.getDescription());
+
+        // set the short info, if available
+        if (entry.getShortText() != null && !entry.getShortText().trim().isEmpty()) {
+            program.setShortInfo(entry.getShortText());
+        }
+
+        // set the genre, if available
+        if (entry.getGenres().size() > 0) {
+            HashMap<Integer, Integer> categoryCount = new HashMap<Integer, Integer>();
+            for (Genre genre : entry.getGenres()) {
+                int code = genre.getCode();
+                int category = (code >> 4);
+                Integer count = categoryCount.get(category);
+                if (count == null) {
+                    count = 0;
+                }
+                categoryCount.put(category, ++count);
+            }
+
+            int max = 0;
+            int category = 0;
+            for (Iterator<Entry<Integer, Integer>> iterator = categoryCount.entrySet().iterator(); iterator.hasNext();) {
+                Entry<Integer, Integer> counter = iterator.next();
+                if (counter.getValue() > max) {
+                    max = counter.getValue();
+                    category = counter.getKey();
+                }
+            }
+
+            switch (category) {
+            case 1:
+                program.setIntField(ProgramFieldType.INFO_TYPE, Program.INFO_CATEGORIE_MOVIE);
+                break;
+            case 2:
+                program.setIntField(ProgramFieldType.INFO_TYPE, Program.INFO_CATEGORIE_NEWS);
+                break;
+            case 3:
+                program.setIntField(ProgramFieldType.INFO_TYPE, Program.INFO_CATEGORIE_SHOW);
+                break;
+            case 4:
+                program.setIntField(ProgramFieldType.INFO_TYPE, Program.INFO_CATEGORIE_SPORTS);
+                break;
+            case 5:
+                program.setIntField(ProgramFieldType.INFO_TYPE, Program.INFO_CATEGORIE_CHILDRENS);
+                break;
+            case 6:
+                // TODO add a i18n field for Music / Dance
+                break;
+            case 7:
+                program.setIntField(ProgramFieldType.INFO_TYPE, Program.INFO_CATEGORIE_ARTS);
+                break;
+            case 8:
+                // TODO add a i18n field Social/Political issues/Economics
+                break;
+            case 9:
+                program.setIntField(ProgramFieldType.INFO_TYPE, Program.INFO_CATEGORIE_MAGAZINE_INFOTAINMENT);
+                break;
+            case 10:
+                program.setIntField(ProgramFieldType.INFO_TYPE, Program.INFO_CATEGORIE_MAGAZINE_INFOTAINMENT);
+                break;
+            default:
+                break;
+            }
+
+            // StringBuilder genres = new StringBuilder(entry.getGenres().get(0).getDescription());
+            // if (entry.getGenres().size() > 1) {
+            // for (int i = 1; i < entry.getGenres().size(); i++) {
+            // genres.append('\n').append(entry.getGenres().get(i).getDescription());
+            // }
+            // }
+            // program.setTextField(ProgramFieldType.GENRE_TYPE, genres.toString());
+        }
+        System.out.println("----------------------");
+
+        // analyze the available streams and set the format informations
+        // program.setIntField(ProgramFieldType., value)
+
         return program;
     }
 
