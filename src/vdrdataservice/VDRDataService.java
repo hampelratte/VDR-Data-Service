@@ -173,6 +173,8 @@ public class VDRDataService extends AbstractTvDataService {
         // set the short info, if available
         if (entry.getShortText() != null && !entry.getShortText().trim().isEmpty()) {
             program.setShortInfo(entry.getShortText());
+        } else {
+            program.setShortInfo(entry.getDescription());
         }
 
         // this field accumulates different info flags, which will show up as small icons
