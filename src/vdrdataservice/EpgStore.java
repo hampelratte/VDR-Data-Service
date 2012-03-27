@@ -66,7 +66,7 @@ public class EpgStore {
             try {
                 fout = new FileOutputStream(saveFile);
                 ObjectOutputStream oout = new ObjectOutputStream(fout);
-                // oout.writeObject(entry.getValue());
+                oout.writeObject(entry.getValue());
 
                 for (EPGEntry epgEntry : entry.getValue()) {
                     logger.debug("{} - {}", epgEntry.getTitle(), epgEntry.getStartTime().getTime());
