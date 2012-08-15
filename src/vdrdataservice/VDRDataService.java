@@ -22,6 +22,7 @@ import org.hampelratte.svdrp.commands.LSTC;
 import org.hampelratte.svdrp.commands.LSTE;
 import org.hampelratte.svdrp.parsers.ChannelParser;
 import org.hampelratte.svdrp.parsers.EPGParser;
+import org.hampelratte.svdrp.responses.highlevel.BroadcastChannel;
 import org.hampelratte.svdrp.responses.highlevel.DVBChannel;
 import org.hampelratte.svdrp.responses.highlevel.EPGEntry;
 import org.hampelratte.svdrp.responses.highlevel.Genre;
@@ -459,12 +460,18 @@ public class VDRDataService extends AbstractTvDataService {
 
                         int maxChannel = Integer.parseInt(props.getProperty("max.channel.number"));
                         if (maxChannel == 0 || maxChannel > 0 && c.getChannelNumber() <= maxChannel) {
-                            // distinguish between radio and tv channels /
-                            // pay-tv
+                            // distinguish between radio and tv channels / pay-tv
                             int category = getChannelCategory(c);
+
+                            String name = c.getName();
+                            if ("true".equals(getProperty("add_source_to_channel_name"))) {
+                                String source = getChannelSource(c);
+                                name += " (" + source + ")";
+                            }
+
                             // create a new tvbrowser channel object
-                            Channel chan = new Channel(this, c.getName(), Integer.toString(c.getChannelNumber()), TimeZone.getDefault(), "de", "", "", cg,
-                                    null, category, c.getName());
+                            Channel chan = new Channel(this, name, Integer.toString(c.getChannelNumber()), TimeZone.getDefault(), "de", "", "", cg, null,
+                                    category, name);
                             channelList.add(chan);
                         }
                     }
@@ -483,6 +490,35 @@ public class VDRDataService extends AbstractTvDataService {
         } else {
             return new Channel[] {};
         }
+    }
+
+    private String getChannelSource(org.hampelratte.svdrp.responses.highlevel.Channel c) {
+        String source = localizer.msg("unknown_source", "unknown source");
+        if (c instanceof BroadcastChannel) {
+            BroadcastChannel brc = (BroadcastChannel) c;
+            String src = brc.getSource();
+            if (src.length() > 0) {
+                char fc = src.toUpperCase().charAt(0);
+                switch (fc) {
+                case 'C':
+                    source = "DVB-C";
+                    break;
+                case 'S':
+                    source = "DVB-S";
+                    break;
+                case 'T':
+                    source = "DVB-T";
+                    break;
+                case 'V':
+                case 'P':
+                    source = "analog";
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+        return source;
     }
 
     private int getChannelCategory(org.hampelratte.svdrp.responses.highlevel.Channel c) {
@@ -527,6 +563,6 @@ public class VDRDataService extends AbstractTvDataService {
     }
 
     public static Version getVersion() {
-        return new Version(0, 55);
+        return new Version(0, 60);
     }
 }
