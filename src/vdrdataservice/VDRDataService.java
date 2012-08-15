@@ -7,11 +7,9 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Enumeration;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
@@ -29,6 +27,8 @@ import org.hampelratte.svdrp.responses.highlevel.DVBChannel;
 import org.hampelratte.svdrp.responses.highlevel.EPGEntry;
 import org.hampelratte.svdrp.responses.highlevel.Genre;
 import org.hampelratte.svdrp.responses.highlevel.PvrInputChannel;
+import org.hampelratte.svdrp.responses.highlevel.Stream;
+import org.hampelratte.svdrp.responses.highlevel.Stream.CONTENT;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -213,78 +213,124 @@ public class VDRDataService extends AbstractTvDataService {
         // set the short info, if available
         if (entry.getShortText() != null && !entry.getShortText().trim().isEmpty()) {
             program.setShortInfo(entry.getShortText());
+        } else {
+            program.setShortInfo(entry.getDescription());
         }
+
+        // this field accumulates different info flags, which will show up as small icons
+        // flags are compined by OR-ing the different values
+        int infoBits = 0;
 
         // set the genre, if available
         if (entry.getGenres().size() > 0) {
-            HashMap<Integer, Integer> categoryCount = new HashMap<Integer, Integer>();
+            // possible TVB categories
+            // Program.INFO_CATEGORIE_ARTS
+            // Program.INFO_CATEGORIE_CHILDRENS
+            // Program.INFO_CATEGORIE_DOCUMENTARY
+            // Program.INFO_CATEGORIE_MAGAZINE_INFOTAINMENT
+            // Program.INFO_CATEGORIE_MOVIE
+            // Program.INFO_CATEGORIE_NEWS
+            // Program.INFO_CATEGORIE_OTHERS
+            // Program.INFO_CATEGORIE_SERIES
+            // Program.INFO_CATEGORIE_SHOW
+            // Program.INFO_CATEGORIE_SPORTS
+
             for (Genre genre : entry.getGenres()) {
                 int code = genre.getCode();
-                int category = (code >> 4);
-                Integer count = categoryCount.get(category);
-                if (count == null) {
-                    count = 0;
+                if (code >= 0x10 && code <= 0x1F) {
+                    infoBits |= Program.INFO_CATEGORIE_MOVIE;
+                    if (code == 0x15) {
+                        infoBits |= Program.INFO_CATEGORIE_SERIES;
+                    }
+                } else if (code >= 0x20 && code <= 0x2F) {
+                    infoBits |= Program.INFO_CATEGORIE_NEWS;
+                } else if (code >= 0x30 && code <= 0x3F) {
+                    infoBits |= Program.INFO_CATEGORIE_SHOW;
+                } else if (code >= 0x40 && code <= 0x4F) {
+                    infoBits |= Program.INFO_CATEGORIE_SPORTS;
+                } else if (code >= 0x50 && code <= 0x5F) {
+                    infoBits |= Program.INFO_CATEGORIE_CHILDRENS;
+                } else if (code >= 0x70 && code <= 0x7F) {
+                    infoBits |= Program.INFO_CATEGORIE_ARTS;
+                } else if (code >= 0x90 && code <= 0xAF) {
+                    infoBits |= Program.INFO_CATEGORIE_MAGAZINE_INFOTAINMENT;
                 }
-                categoryCount.put(category, ++count);
             }
 
-            int max = 0;
-            int category = 0;
-            for (Iterator<Entry<Integer, Integer>> iterator = categoryCount.entrySet().iterator(); iterator.hasNext();) {
-                Entry<Integer, Integer> counter = iterator.next();
-                if (counter.getValue() > max) {
-                    max = counter.getValue();
-                    category = counter.getKey();
-                }
-            }
-
-            switch (category) {
-            case 1:
-                program.setIntField(ProgramFieldType.INFO_TYPE, Program.INFO_CATEGORIE_MOVIE);
-                break;
-            case 2:
-                program.setIntField(ProgramFieldType.INFO_TYPE, Program.INFO_CATEGORIE_NEWS);
-                break;
-            case 3:
-                program.setIntField(ProgramFieldType.INFO_TYPE, Program.INFO_CATEGORIE_SHOW);
-                break;
-            case 4:
-                program.setIntField(ProgramFieldType.INFO_TYPE, Program.INFO_CATEGORIE_SPORTS);
-                break;
-            case 5:
-                program.setIntField(ProgramFieldType.INFO_TYPE, Program.INFO_CATEGORIE_CHILDRENS);
-                break;
-            case 6:
-                // TODO add a i18n field for Music / Dance
-                break;
-            case 7:
-                program.setIntField(ProgramFieldType.INFO_TYPE, Program.INFO_CATEGORIE_ARTS);
-                break;
-            case 8:
-                // TODO add a i18n field Social/Political issues/Economics
-                break;
-            case 9:
-                program.setIntField(ProgramFieldType.INFO_TYPE, Program.INFO_CATEGORIE_MAGAZINE_INFOTAINMENT);
-                break;
-            case 10:
-                program.setIntField(ProgramFieldType.INFO_TYPE, Program.INFO_CATEGORIE_MAGAZINE_INFOTAINMENT);
-                break;
-            default:
-                break;
-            }
-
-            // StringBuilder genres = new StringBuilder(entry.getGenres().get(0).getDescription());
-            // if (entry.getGenres().size() > 1) {
-            // for (int i = 1; i < entry.getGenres().size(); i++) {
-            // genres.append('\n').append(entry.getGenres().get(i).getDescription());
-            // }
-            // }
-            // program.setTextField(ProgramFieldType.GENRE_TYPE, genres.toString());
         }
-        System.out.println("----------------------");
 
         // analyze the available streams and set the format informations
-        // program.setIntField(ProgramFieldType., value)
+        if (entry.getStreams().size() > 0) {
+            for (Stream stream : entry.getStreams()) {
+                if (stream.getContent() == CONTENT.H264) {
+                    if (stream.getType() >= 0x0B && stream.getType() <= 0x10) {
+                        infoBits |= Program.INFO_VISION_HD;
+                    }
+                    switch (stream.getType()) {
+                    case 0x01:
+                    case 0x05:
+                        infoBits |= Program.INFO_VISION_4_TO_3;
+                        break;
+                    case 0x03:
+                    case 0x04:
+                    case 0x07:
+                    case 0x08:
+                    case 0x0B:
+                    case 0x0C:
+                    case 0x0F:
+                    case 0x10:
+                        infoBits |= Program.INFO_VISION_16_TO_9;
+                        break;
+                    default:
+                        break;
+                    }
+                } else if (stream.getContent() == CONTENT.MP2V) {
+                    if (stream.getType() >= 0x09 && stream.getType() <= 0x10) {
+                        infoBits |= Program.INFO_VISION_HD;
+                    }
+                    switch (stream.getType()) {
+                    case 0x01:
+                    case 0x05:
+                    case 0x09:
+                    case 0x0D:
+                        infoBits |= Program.INFO_VISION_4_TO_3;
+                        break;
+                    case 0x02:
+                    case 0x03:
+                    case 0x04:
+                    case 0x06:
+                    case 0x07:
+                    case 0x08:
+                    case 0x0A:
+                    case 0x0B:
+                    case 0x0C:
+                    case 0x0E:
+                    case 0x0F:
+                    case 0x10:
+                        infoBits |= Program.INFO_VISION_16_TO_9;
+                        break;
+                    default:
+                        break;
+                    }
+                } else if (stream.getContent() == CONTENT.MP2A) {
+                    if (stream.getType() == 0x03) {
+                        infoBits |= Program.INFO_AUDIO_STEREO;
+                    } else if (stream.getType() == 0x01) {
+                        infoBits |= Program.INFO_AUDIO_MONO;
+                    } else if (stream.getType() == 0x40) {
+                        infoBits |= Program.INFO_AUDIO_DESCRIPTION;
+                    }
+                } else if (stream.getContent() == CONTENT.AC3) {
+                    if (stream.getType() == 0x44) {
+                        infoBits |= Program.INFO_AUDIO_DOLBY_DIGITAL_5_1;
+                    }
+                } else if (stream.getContent() == CONTENT.SUBTITLE && stream.getType() >= 0x20 && stream.getType() <= 0x24) {
+                    infoBits |= Program.INFO_SUBTITLE_FOR_AURALLY_HANDICAPPED;
+                }
+            }
+
+            program.setIntField(ProgramFieldType.INFO_TYPE, infoBits);
+        }
 
         return program;
     }
@@ -440,13 +486,13 @@ public class VDRDataService extends AbstractTvDataService {
     @Override
     public Channel[] checkForAvailableChannels(ChannelGroup cg, ProgressMonitor pm) throws TvBrowserException {
         if (cg.getId().equals(this.cg.getId())) {
-            pm.setMessage(localizer.msg("getting_data", "Getting data from VDR..."));
+            pm.setMessage(localizer.msg("getting_channels", "Getting channels from VDR..."));
             // load channel list from vdr
             Response res = VDRConnection.send(new LSTC());
-            if (res.getCode() == 250) {
+            if (res != null && res.getCode() == 250) {
                 try {
                     // parse the channel list
-                    List<org.hampelratte.svdrp.responses.highlevel.Channel> vdrChannelList = ChannelParser.parse(res.getMessage(), false);
+                    List<org.hampelratte.svdrp.responses.highlevel.Channel> vdrChannelList = ChannelParser.parse(res.getMessage(), false, true);
                     List<Channel> channelList = new ArrayList<Channel>();
                     for (Iterator<org.hampelratte.svdrp.responses.highlevel.Channel> iterator = vdrChannelList.iterator(); iterator.hasNext();) {
                         org.hampelratte.svdrp.responses.highlevel.Channel c = iterator.next();
@@ -486,7 +532,14 @@ public class VDRDataService extends AbstractTvDataService {
             if ("0".equals(vpid) || "1".equals(vpid)) { // a radio station
                 return Channel.CATEGORY_RADIO;
             } else { // a tv channel
-                if (!"0".equals(chan.getConditionalAccess())) {
+                boolean payTv = false;
+                List<Integer> ca = chan.getConditionalAccess();
+                for (Integer caId : ca) {
+                    if (caId != 0) {
+                        payTv = true;
+                    }
+                }
+                if (payTv) {
                     return Channel.CATEGORY_TV | Channel.CATEGORY_PAY_TV;
                 } else {
                     return Channel.CATEGORY_TV | Channel.CATEGORY_DIGITAL;
