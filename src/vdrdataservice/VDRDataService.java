@@ -449,7 +449,7 @@ public class VDRDataService extends AbstractTvDataService {
             pm.setMessage(localizer.msg("getting_channels", "Getting channels from VDR..."));
             // load channel list from vdr
             Response res = VDRConnection.send(new LSTC());
-            if (res.getCode() == 250) {
+            if (res != null && res.getCode() == 250) {
                 try {
                     // parse the channel list
                     List<org.hampelratte.svdrp.responses.highlevel.Channel> vdrChannelList = ChannelParser.parse(res.getMessage(), false, true);
