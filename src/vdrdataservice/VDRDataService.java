@@ -446,7 +446,7 @@ public class VDRDataService extends AbstractTvDataService {
     @Override
     public Channel[] checkForAvailableChannels(ChannelGroup cg, ProgressMonitor pm) throws TvBrowserException {
         if (cg.getId().equals(this.cg.getId())) {
-            pm.setMessage(localizer.msg("getting_data", "Getting data from VDR..."));
+            pm.setMessage(localizer.msg("getting_channels", "Getting channels from VDR..."));
             // load channel list from vdr
             Response res = VDRConnection.send(new LSTC());
             if (res.getCode() == 250) {
@@ -492,7 +492,14 @@ public class VDRDataService extends AbstractTvDataService {
             if ("0".equals(vpid) || "1".equals(vpid)) { // a radio station
                 return Channel.CATEGORY_RADIO;
             } else { // a tv channel
-                if (!"0".equals(chan.getConditionalAccess())) {
+                boolean payTv = false;
+                List<Integer> ca = chan.getConditionalAccess();
+                for (Integer caId : ca) {
+                    if (caId != 0) {
+                        payTv = true;
+                    }
+                }
+                if (payTv) {
                     return Channel.CATEGORY_TV | Channel.CATEGORY_PAY_TV;
                 } else {
                     return Channel.CATEGORY_TV | Channel.CATEGORY_DIGITAL;
