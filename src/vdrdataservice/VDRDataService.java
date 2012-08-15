@@ -452,7 +452,7 @@ public class VDRDataService extends AbstractTvDataService {
             if (res.getCode() == 250) {
                 try {
                     // parse the channel list
-                    List<org.hampelratte.svdrp.responses.highlevel.Channel> vdrChannelList = ChannelParser.parse(res.getMessage(), true);
+                    List<org.hampelratte.svdrp.responses.highlevel.Channel> vdrChannelList = ChannelParser.parse(res.getMessage(), false, true);
                     List<Channel> channelList = new ArrayList<Channel>();
                     for (Iterator<org.hampelratte.svdrp.responses.highlevel.Channel> iterator = vdrChannelList.iterator(); iterator.hasNext();) {
                         org.hampelratte.svdrp.responses.highlevel.Channel c = iterator.next();
@@ -520,6 +520,6 @@ public class VDRDataService extends AbstractTvDataService {
     }
 
     public static Version getVersion() {
-        return new Version(0, 54);
+        return new Version(0, 55);
     }
 }
