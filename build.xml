@@ -1,18 +1,18 @@
 <?xml version="1.0"?>
 
 <project name="VDRDataService" default="run" basedir=".">
-	<property file="build.properties"/>
+	<property file="build.properties" />
 
 	<property name="tvbrowser.lib.dir" value="${tvbrowser.dir}/lib" />
 	<property name="tvbrowser.src.dir" value="${tvbrowser.dir}/src" />
 
 	<property name="src.dir" value="src" />
-	<property name="doc.dir" value="doc"/>
+	<property name="doc.dir" value="doc" />
 	<property name="lib.dir" value="lib" />
 	<property name="build.dir" value="build" />
 	<property name="classes.dir" value="${build.dir}/classes" />
 	<property name="res.dir" value="res" />
-	<property name="jar.file" value="${tvbrowser.runtime.dir}/plugins/VDRDataService.jar"/>
+	<property name="jar.file" value="${tvbrowser.runtime.dir}/plugins/VDRDataService.jar" />
 
 
 	<target name="compile" depends="clean">
@@ -48,36 +48,35 @@
 
 	<target name="dist" depends="jar" description="Make distribution zip">
 		<property name="dist-tmp.dir" value="${build.dir}/dist-tmp" />
-		<mkdir dir="${dist-tmp.dir}"/>
+		<mkdir dir="${dist-tmp.dir}" />
 
 		<delete>
-			<fileset dir="${build.dir}" includes="*.zip"/>
+			<fileset dir="${build.dir}" includes="*.zip" />
 		</delete>
 
-		<copy file="${jar.file}" todir="${dist-tmp.dir}/${ant.project.name}-${version}/"/>
+		<copy file="${jar.file}" todir="${dist-tmp.dir}/${ant.project.name}-${version}/" />
 		<copy todir="${dist-tmp.dir}/${ant.project.name}-${version}">
 			<fileset dir="${doc.dir}">
 			</fileset>
 		</copy>
 
-		<zip destfile="${build.dir}/${ant.project.name}-${version}.zip" 
-             basedir="${dist-tmp.dir}"/>
+		<zip destfile="${build.dir}/${ant.project.name}-${version}.zip" basedir="${dist-tmp.dir}" />
 
-		<delete dir="${dist-tmp.dir}"/>
+		<delete dir="${dist-tmp.dir}" />
 	</target>
 
 	<target name="run" depends="jar">
 		<java jar="${tvbrowser.runtime.dir}/tvbrowser.jar" dir="${tvbrowser.runtime.dir}" fork="true">
-			<jvmarg value="-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=7777"/>
-			<jvmarg value="-Djava.util.logging.config.file=${basedir}/logging.properties"/>
+			<jvmarg value="-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=7777" />
+			<jvmarg value="-Djava.util.logging.config.file=${basedir}/logging.properties" />
 		</java>
 	</target>
-	
+
 	<target name="run-vdr-local" depends="jar">
 		<java jar="${tvbrowser.runtime.dir}/tvbrowser.jar" dir="${tvbrowser.runtime.dir}" fork="true">
-			<jvmarg value="-Duser.home=/home/henni/.tvbrowser-vdr-local"/>
-			<jvmarg value="-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=7777"/>
-			<jvmarg value="-Djava.util.logging.config.file=${basedir}/logging.properties"/>
+			<jvmarg value="-Duser.home=/home/henni/.tvbrowser-vdr-local" />
+			<jvmarg value="-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=7777" />
+			<jvmarg value="-Djava.util.logging.config.file=${basedir}/logging.properties" />
 		</java>
 	</target>
 </project>
