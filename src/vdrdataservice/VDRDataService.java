@@ -6,9 +6,11 @@ import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Properties;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
@@ -22,6 +24,7 @@ import org.hampelratte.svdrp.commands.LSTC;
 import org.hampelratte.svdrp.commands.LSTE;
 import org.hampelratte.svdrp.parsers.ChannelParser;
 import org.hampelratte.svdrp.parsers.EPGParser;
+import org.hampelratte.svdrp.responses.highlevel.BroadcastChannel;
 import org.hampelratte.svdrp.responses.highlevel.DVBChannel;
 import org.hampelratte.svdrp.responses.highlevel.EPGEntry;
 import org.hampelratte.svdrp.responses.highlevel.Genre;
@@ -60,14 +63,22 @@ public class VDRDataService extends AbstractTvDataService {
 
     private VDRDataServiceSettingsPanel settingsPanel;
 
-    private Channel[] channels = new Channel[] {};
-
     private final Properties props = new Properties();
 
-    private final ChannelGroup cg = new ChannelGroupImpl("vdr", "VDR", "Channels from VDR", "VDR");
+    private final String i18n_channelsFromVDR = localizer.msg("channels_from_VDR", "Channels from VDR");
+    private final String i18n_unknownSource = localizer.msg("unknown_source", "unknown source");
+    private final ChannelGroup cgDvbc = new ChannelGroupImpl("C", "VDR (DVB-C)", i18n_channelsFromVDR, "VDR (DVB-C)");
+    private final ChannelGroup cgDvbs = new ChannelGroupImpl("S", "VDR (DVB-S)", i18n_channelsFromVDR, "VDR (DVB-S)");
+    private final ChannelGroup cgDvbt = new ChannelGroupImpl("T", "VDR (DVB-T)", i18n_channelsFromVDR, "VDR (DVB-T)");
+    private final ChannelGroup cgAnalog = new ChannelGroupImpl("P|V", "VDR (analog)", i18n_channelsFromVDR, "VDR (analog)");
+    private final ChannelGroup cgUnknownSource = new ChannelGroupImpl("[^CSTVP]", "VDR (" + i18n_unknownSource + ")", i18n_channelsFromVDR, "VDR ("
+            + i18n_unknownSource + ")");
+    private final ChannelGroup[] cgs = new ChannelGroup[] { cgDvbc, cgDvbs, cgDvbt, cgAnalog, cgUnknownSource };
 
     private final PluginInfo pluginInfo = new PluginInfo(VDRDataService.class, "VDR DataService", localizer.msg("desc",
             "Loads the EPG-Data from VDR (by Klaus Schmidinger) into TV-Browser"), "Henrik Niehaus (hampelratte@users.sf.net)");
+
+    private Map<ChannelGroup, List<Channel>> groupChannels = new HashMap<ChannelGroup, List<Channel>>();
 
     @Override
     public void updateTvData(TvDataUpdateManager database, Channel[] channels, devplugin.Date date, int dateCount, ProgressMonitor pm)
@@ -304,7 +315,6 @@ public class VDRDataService extends AbstractTvDataService {
         props.setProperty("max.channel.number", "100");
 
         // overwrite defaults with values from configfile
-        List<Channel> list = new ArrayList<Channel>();
         Enumeration<?> en = p.keys();
         while (en.hasMoreElements()) {
             String key = (String) en.nextElement();
@@ -332,14 +342,26 @@ public class VDRDataService extends AbstractTvDataService {
                     } catch (NumberFormatException e) {
                     }
                     copy = copy == null ? "" : copy;
-                    Channel chan = new Channel(this, name, channelID, TimeZone.getDefault(), "de", "", "", cg, null, category);
-                    // new Channel(this, name, channelID, TimeZone.getDefault(), country, copy, "", cg);
-                    list.add(chan);
+
+                    String groupId = props.getProperty("CHANNELGROUP" + id);
+                    ChannelGroup group = null;
+                    for (ChannelGroup cg : cgs) {
+                        if (groupId.equals(cg.getId())) {
+                            group = cg;
+                            break;
+                        }
+                    }
+
+                    Channel chan = new Channel(this, name, channelID, TimeZone.getDefault(), "de", "", "", group, null, category);
+                    List<Channel> channels = groupChannels.get(group);
+                    if (channels == null) {
+                        channels = new ArrayList<Channel>();
+                        groupChannels.put(group, channels);
+                    }
+                    channels.add(chan);
                 }
             }
         }
-
-        channels = list.toArray(channels);
 
         VDRConnection.host = props.getProperty("vdr.host");
         VDRConnection.port = Integer.parseInt(props.getProperty("vdr.port"));
@@ -370,24 +392,28 @@ public class VDRDataService extends AbstractTvDataService {
         sweepOffChannelsFromProps();
 
         // save the current channels
-        for (int i = 0; i < channels.length; i++) {
-            if (channels[i].getId() != null) {
-                props.setProperty("CHANNELID" + i, channels[i].getId());
-            }
-            if (channels[i].getName() != null) {
-                props.setProperty("CHANNELNAME" + i, channels[i].getName());
-            }
-            if (channels[i].getWebpage() != null) {
-                props.setProperty("CHANNELURL" + i, channels[i].getWebpage());
-            }
-            if (channels[i].getCountry() != null) {
-                props.setProperty("CHANNELCOUNTRY" + i, channels[i].getCountry());
-            }
+        for (List<Channel> channels : groupChannels.values()) {
+            for (Channel channel : channels) {
+                String id = channel.getId();
+                props.setProperty("CHANNELID" + id, channel.getId());
 
-            props.setProperty("CHANNELCATEGORY" + i, "" + channels[i].getCategories());
+                if (channel.getName() != null) {
+                    props.setProperty("CHANNELNAME" + id, channel.getName());
+                }
+                if (channel.getWebpage() != null) {
+                    props.setProperty("CHANNELURL" + id, channel.getWebpage());
+                }
+                if (channel.getCountry() != null) {
+                    props.setProperty("CHANNELCOUNTRY" + id, channel.getCountry());
+                }
 
-            if (channels[i].getCopyrightNotice() != null) {
-                props.setProperty("CHANNELCOPYRIGHT" + i, channels[i].getCopyrightNotice());
+                props.setProperty("CHANNELCATEGORY" + id, "" + channel.getCategories());
+
+                props.setProperty("CHANNELGROUP" + id, channel.getGroup().getId());
+
+                if (channel.getCopyrightNotice() != null) {
+                    props.setProperty("CHANNELCOPYRIGHT" + id, channel.getCopyrightNotice());
+                }
             }
         }
         return props;
@@ -429,60 +455,107 @@ public class VDRDataService extends AbstractTvDataService {
 
     @Override
     public ChannelGroup[] getAvailableGroups() {
-        ChannelGroup[] cgs = new ChannelGroup[] { cg };
         return cgs;
     }
 
     @Override
     public Channel[] getAvailableChannels(ChannelGroup cg) {
-        if (cg.equals(this.cg)) {
-            logger.info("Returning " + channels.length + " channels");
-            return this.channels;
-        } else {
+        List<Channel> _channels = groupChannels.get(cg);
+        if (_channels == null) {
             return new Channel[] {};
+        } else {
+            Channel[] channels = new Channel[_channels.size()];
+            channels = _channels.toArray(channels);
+            return channels;
         }
+
+        /*
+         * if (cg.equals(this.cgDvbs)) { logger.info("Returning " + channels.length + " channels"); return this.channels; } else { return new Channel[] {}; }
+         */
     }
 
     @Override
     public Channel[] checkForAvailableChannels(ChannelGroup cg, ProgressMonitor pm) throws TvBrowserException {
-        if (cg.getId().equals(this.cg.getId())) {
-            pm.setMessage(localizer.msg("getting_channels", "Getting channels from VDR..."));
-            // load channel list from vdr
-            Response res = VDRConnection.send(new LSTC());
-            if (res != null && res.getCode() == 250) {
-                try {
-                    // parse the channel list
-                    List<org.hampelratte.svdrp.responses.highlevel.Channel> vdrChannelList = ChannelParser.parse(res.getMessage(), false, true);
-                    List<Channel> channelList = new ArrayList<Channel>();
-                    for (Iterator<org.hampelratte.svdrp.responses.highlevel.Channel> iterator = vdrChannelList.iterator(); iterator.hasNext();) {
-                        org.hampelratte.svdrp.responses.highlevel.Channel c = iterator.next();
+        pm.setMessage(localizer.msg("getting_channels", "Getting channels from VDR for group {0}", cg.getName()));
+        // load channel list from vdr
+        List<Channel> channelList = new ArrayList<Channel>();
+        Response res = VDRConnection.send(new LSTC());
+        if (res != null && res.getCode() == 250) {
+            try {
+                // parse the channel list
+                List<org.hampelratte.svdrp.responses.highlevel.Channel> vdrChannelList = ChannelParser.parse(res.getMessage(), false, true);
+                for (Iterator<org.hampelratte.svdrp.responses.highlevel.Channel> iterator = vdrChannelList.iterator(); iterator.hasNext();) {
+                    org.hampelratte.svdrp.responses.highlevel.Channel c = iterator.next();
 
-                        int maxChannel = Integer.parseInt(props.getProperty("max.channel.number"));
-                        if (maxChannel == 0 || maxChannel > 0 && c.getChannelNumber() <= maxChannel) {
-                            // distinguish between radio and tv channels /
-                            // pay-tv
-                            int category = getChannelCategory(c);
-                            // create a new tvbrowser channel object
-                            Channel chan = new Channel(this, c.getName(), Integer.toString(c.getChannelNumber()), TimeZone.getDefault(), "de", "", "", cg,
-                                    null, category, c.getName());
-                            channelList.add(chan);
+                    int maxChannel = Integer.parseInt(props.getProperty("max.channel.number"));
+                    if (maxChannel == 0 || maxChannel > 0 && c.getChannelNumber() <= maxChannel) {
+                        // check if this channel belongs to this channel group
+                        if (c instanceof BroadcastChannel) {
+                            BroadcastChannel brc = (BroadcastChannel) c;
+                            String src = brc.getSource();
+                            if (!src.toUpperCase().substring(0, 1).matches(cg.getId())) {
+                                continue;
+                            }
+                        } else if (cg != cgUnknownSource) {
+                            continue;
                         }
+
+                        // distinguish between radio and tv channels / pay-tv
+                        int category = getChannelCategory(c);
+                        String name = c.getName();
+                        if ("true".equals(getProperty("add_source_to_channel_name"))) {
+                            String source = getChannelSource(c);
+                            name += " (" + source + ")";
+                        }
+                        // create a new tvbrowser channel object
+                        Channel chan = new Channel(this, name, Integer.toString(c.getChannelNumber()), TimeZone.getDefault(), "de", "", "", cg, null, category,
+                                c.getName());
+                        channelList.add(chan);
                     }
+                }
+            } catch (NumberFormatException e) {
+                logger.error("Couldn't parse number", e);
+            } catch (ParseException e) {
+                logger.error("Couldn't parse channel list", e);
+            }
+        }
 
-                    // convert channel list to an array
-                    channels = new Channel[channelList.size()];
-                    channels = channelList.toArray(channels);
+        // save for later use
+        groupChannels.put(cg, channelList);
 
-                } catch (NumberFormatException e) {
-                    logger.error("Couldn't parse number", e);
-                } catch (ParseException e) {
-                    logger.error("Couldn't parse channel list", e);
+        // convert channel list to an array
+        Channel[] channels = new Channel[channelList.size()];
+        channels = channelList.toArray(channels);
+        return channels;
+    }
+
+    private String getChannelSource(org.hampelratte.svdrp.responses.highlevel.Channel c) {
+        String source = i18n_unknownSource;
+        if (c instanceof BroadcastChannel) {
+            BroadcastChannel brc = (BroadcastChannel) c;
+            String src = brc.getSource();
+            if(src.length() > 0) {
+                char fc = src.toUpperCase().charAt(0);
+                switch (fc) {
+                case 'C':
+                    source = "DVB-C";
+                    break;
+                case 'S':
+                    source = "DVB-S";
+                    break;
+                case 'T':
+                    source = "DVB-T";
+                    break;
+                case 'V':
+                case 'P':
+                    source = "analog";
+                    break;
+                default:
+                    break;
                 }
             }
-            return channels;
-        } else {
-            return new Channel[] {};
         }
+        return source;
     }
 
     private int getChannelCategory(org.hampelratte.svdrp.responses.highlevel.Channel c) {
