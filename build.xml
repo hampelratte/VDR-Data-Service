@@ -73,6 +73,9 @@
 		</java>
 	</target>
 	
+	<!-- 
+	<target name="run-vdr-local">
+	-->
 	<target name="run-vdr-local" depends="jar">
 		<java jar="${tvbrowser.runtime.dir}/tvbrowser.jar" dir="${tvbrowser.runtime.dir}" fork="true">
 			<jvmarg value="-Duser.home=/home/henni/.tvbrowser-vdr-local"/>
