@@ -116,9 +116,6 @@ public class VDRDataService extends AbstractTvDataService {
                     }
 
                     pm.setValue(i);
-
-                    // FIXME remove
-                    break;
                 }
             } catch (Exception e) {
                 logger.error("Error while updating the EPG", e);
