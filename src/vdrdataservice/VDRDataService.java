@@ -1,5 +1,8 @@
 package vdrdataservice;
 
+import static devplugin.ProgramFieldType.INFO_TYPE;
+import static devplugin.ProgramFieldType.SHORT_DESCRIPTION_TYPE;
+
 import java.io.File;
 import java.io.IOException;
 import java.text.ParseException;
@@ -114,6 +117,8 @@ public class VDRDataService extends AbstractTvDataService {
 
                     pm.setValue(i);
 
+                    // FIXME remove
+                    break;
                 }
             } catch (Exception e) {
                 logger.error("Error while updating the EPG", e);
@@ -167,6 +172,7 @@ public class VDRDataService extends AbstractTvDataService {
             // VDR only returns EPG from "now" on. So we have to copy programsto the new dayProgram, which ran today already
             if (i == 1) { // today
                 Iterator<Program> iterator = getPluginManager().getChannelDayProgram(currentDate, channel);
+                logger.info("ChannelDayProgram {}", iterator);
                 while (iterator.hasNext()) {
                     Calendar now = GregorianCalendar.getInstance();
                     int nowMinutesSinceMidnight = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
@@ -176,12 +182,10 @@ public class VDRDataService extends AbstractTvDataService {
                     // new day program
                     int endTimeSinceMidnight = p.getStartTime() + p.getLength();
                     if (endTimeSinceMidnight <= nowMinutesSinceMidnight) {
-                        dayProgram.addProgram(iterator.next());
+                        dayProgram.addProgram(toMutableProgram(p));
                     }
                 }
             }
-
-            logger.info("Date count is {}", dateCount);
 
             dayProgramList.add(dayProgram);
         }
@@ -322,6 +326,28 @@ public class VDRDataService extends AbstractTvDataService {
 
             program.setIntField(ProgramFieldType.INFO_TYPE, infoBits);
         }
+
+        return program;
+    }
+
+    private MutableProgram toMutableProgram(Program entry) {
+        MutableProgram program = new MutableProgram(entry.getChannel(), entry.getDate(), entry.getHours(), entry.getMinutes(), false);
+
+        // set the title
+        program.setTitle(entry.getTitle());
+
+        // set the description
+        program.setDescription(entry.getDescription());
+
+        // set the short info, if available
+        if (entry.getTextField(SHORT_DESCRIPTION_TYPE) != null && !entry.getTextField(SHORT_DESCRIPTION_TYPE).trim().isEmpty()) {
+            program.setShortInfo(entry.getTextField(SHORT_DESCRIPTION_TYPE));
+        } else {
+            program.setShortInfo(entry.getDescription());
+        }
+
+        // set info bits like category, video and audio attributes etc.
+        program.setIntField(INFO_TYPE, entry.getIntField(INFO_TYPE));
 
         return program;
     }
