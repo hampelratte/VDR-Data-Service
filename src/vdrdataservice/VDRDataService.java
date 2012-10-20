@@ -3,10 +3,10 @@ package vdrdataservice;
 import java.io.File;
 import java.io.IOException;
 import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Enumeration;
+import java.util.GregorianCalendar;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
@@ -71,8 +71,6 @@ public class VDRDataService extends AbstractTvDataService {
     private final PluginInfo pluginInfo = new PluginInfo(VDRDataService.class, "VDR DataService", localizer.msg("desc",
             "Loads the EPG-Data from VDR (by Klaus Schmidinger) into TV-Browser"), "Henrik Niehaus (hampelratte@users.sf.net)");
 
-    private EpgStore epgStore;
-
     @Override
     public void updateTvData(TvDataUpdateManager database, Channel[] channels, devplugin.Date date, int dateCount, ProgressMonitor pm)
             throws TvBrowserException {
@@ -94,10 +92,12 @@ public class VDRDataService extends AbstractTvDataService {
                             if (dayPrograms[j].getProgramCount() > 0) {
                                 logger.debug("Adding mutable program: {}", dayPrograms[j]);
                                 Iterator<Program> it = dayPrograms[j].getPrograms();
+
                                 while (it.hasNext()) {
                                     Program p = it.next();
                                     logger.debug("Adding Program {} {} {}", new Object[] { p.getTitle(), p.getDateString(), p.getTimeString() });
                                 }
+
                                 database.updateDayProgram(dayPrograms[j]);
                             }
                         }
@@ -133,9 +133,6 @@ public class VDRDataService extends AbstractTvDataService {
             }
         }
         pm.setMessage(localizer.msg("success", "Successfully retrieved data from VDR"));
-
-        // now delete old files from the data directory
-        epgStore.sweepDataDirectory();
     }
 
     private MutableChannelDayProgram[] parseData(String data, Channel channel, Date date, int dateCount) {
@@ -145,9 +142,6 @@ public class VDRDataService extends AbstractTvDataService {
 
         // parse the data
         List<EPGEntry> entries = new EPGParser().parse(data);
-
-        // save the data in the epg store
-        epgStore.store(channel, entries);
 
         for (int i = 0; i < dateCount; i++) {
             Calendar start = date.getCalendar();
@@ -170,28 +164,24 @@ public class VDRDataService extends AbstractTvDataService {
                 }
             }
 
-            /*
-             * Old data has to be read from disk. Otherwise TVB would not show any data before "now", since VDR only sends the EPG after "now"
-             */
-            if (i <= 1) { // yesterday or today
-                logger.debug("Looking up old program for {}", start.getTime());
-                List<EPGEntry> oldEntries = epgStore.load(channel, start);
-                if (oldEntries != null) {
-                    Calendar now = Calendar.getInstance();
-                    for (EPGEntry entry : oldEntries) {
-                        if ((entry.getStartTime().after(start) && entry.getEndTime().before(stop))
-                                || entry.getStartTime().get(Calendar.DAY_OF_MONTH) == start.get(Calendar.DAY_OF_MONTH) && entry.getStartTime().before(now)) {
+            // VDR only returns EPG from "now" on. So we have to copy programsto the new dayProgram, which ran today already
+            if (i == 1) { // today
+                Iterator<Program> iterator = getPluginManager().getChannelDayProgram(currentDate, channel);
+                while (iterator.hasNext()) {
+                    Calendar now = GregorianCalendar.getInstance();
+                    int nowMinutesSinceMidnight = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
+                    Program p = iterator.next();
 
-                            SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy HH:mm");
-                            logger.debug("Adding old program {} at {} for channel {}",
-                                    new Object[] { entry.getTitle(), sdf.format(entry.getStartTime().getTime()), channel.getName() });
-
-                            program = entryToProgram(channel, entry);
-                            dayProgram.addProgram(program);
-                        }
+                    // if the end time of the old program is in the past, we have to add this program to the
+                    // new day program
+                    int endTimeSinceMidnight = p.getStartTime() + p.getLength();
+                    if (endTimeSinceMidnight <= nowMinutesSinceMidnight) {
+                        dayProgram.addProgram(iterator.next());
                     }
                 }
             }
+
+            logger.info("Date count is {}", dateCount);
 
             dayProgramList.add(dayProgram);
         }
@@ -598,12 +588,11 @@ public class VDRDataService extends AbstractTvDataService {
         return false;
     }
 
-    @Override
-    public void setWorkingDirectory(File dataDir) {
-        epgStore = new EpgStore(dataDir);
-    }
-
     public static Version getVersion() {
         return new Version(0, 70);
+    }
+
+    @Override
+    public void setWorkingDirectory(File dataDir) {
     }
 }
