@@ -421,8 +421,8 @@ public class VDRDataService extends AbstractTvDataService {
             if (channels[i].getWebpage() != null) {
                 props.setProperty("CHANNELURL" + i, channels[i].getWebpage());
             }
-            if (channels[i].getCountry() != null) {
-                props.setProperty("CHANNELCOUNTRY" + i, channels[i].getCountry());
+            if (channels[i].getBaseCountry() != null) {
+                props.setProperty("CHANNELCOUNTRY" + i, channels[i].getBaseCountry());
             }
 
             props.setProperty("CHANNELCATEGORY" + i, "" + channels[i].getCategories());
@@ -604,6 +604,6 @@ public class VDRDataService extends AbstractTvDataService {
     }
 
     public static Version getVersion() {
-        return new Version(0, 60);
+        return new Version(0, 70);
     }
 }
