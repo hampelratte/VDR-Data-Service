@@ -612,7 +612,7 @@ public class VDRDataService extends AbstractTvDataService {
     }
 
     public static Version getVersion() {
-        return new Version(0, 70);
+        return new Version(0, 71);
     }
 
     @Override
