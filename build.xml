@@ -18,7 +18,7 @@
 	<target name="compile" depends="clean">
 		<mkdir dir="${build.dir}" />
 		<mkdir dir="${classes.dir}" />
-		<javac srcdir="${src.dir}" destdir="${classes.dir}" deprecation="true" debug="true">
+		<javac srcdir="${src.dir}" destdir="${classes.dir}" deprecation="true" debug="true" source="17" target="17">
 			<classpath>
 				<pathelement location="${tvbrowser.runtime.dir}/tvbrowser.jar" />
 				<fileset dir="${lib.dir}">
